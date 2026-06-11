@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm create *)",
+      "Bash(npx hardhat *)",
+      "Bash(npm pkg *)",
+      "Bash(node -e \"import\\('E:/ISI trabajos/7moSem/Sistemas Distribuidos/Practica6/SistemaDeCertificacionAcademica/blockchain/node_modules/hardhat/config.js'\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")",
+      "Bash(python *)",
+      "Bash(npx vite *)",
+      "Bash(echo \"PID=$!\")",
+      "Read(//tmp/**)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(node -e \"const pkg = require\\('./node_modules/@openzeppelin/contracts/package.json'\\); console.log\\('OZ version:', pkg.version\\)\")"
+    ]
+  }
+}

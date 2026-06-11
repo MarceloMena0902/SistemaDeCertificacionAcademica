@@ -1,0 +1,438 @@
+/* ─── Variables de diseño ────────────────────────────────────────────────────── */
+:root {
+  --primary:       #1a3c6e;
+  --primary-dark:  #122d54;
+  --primary-light: #2a5298;
+  --accent:        #3b82f6;
+  --success:       #22c55e;
+  --warning:       #f59e0b;
+  --danger:        #ef4444;
+  --danger-dark:   #b91c1c;
+  --text:          #1e293b;
+  --text-muted:    #64748b;
+  --border:        #e2e8f0;
+  --bg:            #f8fafc;
+  --bg-card:       #ffffff;
+  --radius:        8px;
+  --shadow-sm:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:     0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* ─── Reset aplicado sobre el que ya trae index.css ─────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin:     0;
+  background: var(--bg);
+  color:      var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size:  16px;
+  line-height: 1.5;
+}
+
+/* Anular el ancho fijo que pone el #root de Vite */
+#root {
+  width:       100%;
+  max-width:   100%;
+  margin:      0;
+  text-align:  left;
+  border:      none;
+  min-height:  100svh;
+  display:     flex;
+  flex-direction: column;
+}
+
+/* ─── Shell de la app ────────────────────────────────────────────────────────── */
+.app-shell {
+  display:        flex;
+  flex-direction: column;
+  min-height:     100svh;
+}
+
+.app-main {
+  flex:    1;
+  padding: 0;
+}
+
+/* ─── Tabs ───────────────────────────────────────────────────────────────────── */
+.tab-bar {
+  display:          flex;
+  gap:              0;
+  background:       var(--bg-card);
+  border-bottom:    2px solid var(--border);
+  padding:          0 2rem;
+}
+
+.tab-btn {
+  background:     transparent;
+  border:         none;
+  border-bottom:  3px solid transparent;
+  margin-bottom:  -2px;
+  padding:        0.9rem 1.4rem;
+  font-size:      0.92rem;
+  font-weight:    500;
+  color:          var(--text-muted);
+  cursor:         pointer;
+  transition:     color 0.15s, border-color 0.15s;
+  white-space:    nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--primary);
+}
+
+.tab-btn--active {
+  color:        var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight:  700;
+}
+
+.tab-panel {
+  max-width:  860px;
+  margin:     2rem auto;
+  padding:    0 1.5rem;
+  width:      100%;
+}
+
+/* ─── Pantalla de bienvenida ─────────────────────────────────────────────────── */
+.welcome {
+  display:         flex;
+  justify-content: center;
+  align-items:     center;
+  padding:         4rem 1.5rem;
+  min-height:      calc(100svh - 64px);
+}
+
+.welcome-card {
+  background:    var(--bg-card);
+  border:        1px solid var(--border);
+  border-radius: 16px;
+  padding:       3rem 2.5rem;
+  max-width:     520px;
+  width:         100%;
+  text-align:    center;
+  box-shadow:    var(--shadow-md);
+}
+
+.welcome-icon {
+  font-size: 3.5rem;
+  display:   block;
+  margin-bottom: 0.5rem;
+}
+
+.welcome-title {
+  font-size:   2rem;
+  font-weight: 700;
+  color:       var(--primary);
+  margin:      0 0 0.5rem;
+}
+
+.welcome-subtitle {
+  color:         var(--text-muted);
+  font-size:     0.95rem;
+  margin-bottom: 1.75rem;
+}
+
+.feature-list {
+  list-style: none;
+  padding:    0;
+  margin:     0 0 2rem;
+  text-align: left;
+  display:    flex;
+  flex-direction: column;
+  gap:        0.6rem;
+}
+
+.feature-list li {
+  background:    var(--bg);
+  border:        1px solid var(--border);
+  border-radius: var(--radius);
+  padding:       0.55rem 0.9rem;
+  font-size:     0.9rem;
+  color:         var(--text);
+}
+
+.welcome-note {
+  margin-top: 1rem;
+  font-size:  0.8rem;
+  color:      var(--text-muted);
+}
+
+/* ─── Botones ────────────────────────────────────────────────────────────────── */
+.btn-primary {
+  background:    var(--primary);
+  color:         #fff;
+  border:        none;
+  border-radius: var(--radius);
+  padding:       0.6rem 1.25rem;
+  font-size:     0.9rem;
+  font-weight:   600;
+  cursor:        pointer;
+  transition:    background 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-primary:disabled              { opacity: 0.55; cursor: not-allowed; }
+
+.btn-primary.btn-lg {
+  width:     100%;
+  padding:   0.85rem;
+  font-size: 1rem;
+}
+
+.btn-secondary {
+  background:    transparent;
+  color:         var(--primary);
+  border:        1.5px solid var(--primary);
+  border-radius: var(--radius);
+  padding:       0.55rem 1.1rem;
+  font-size:     0.88rem;
+  font-weight:   600;
+  cursor:        pointer;
+  transition:    background 0.15s, color 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--primary);
+  color:      #fff;
+}
+
+.btn-danger {
+  background:    var(--danger);
+  color:         #fff;
+  border:        none;
+  border-radius: var(--radius);
+  padding:       0.6rem 1.25rem;
+  font-size:     0.9rem;
+  font-weight:   600;
+  cursor:        pointer;
+  transition:    background 0.15s;
+}
+
+.btn-danger:hover:not(:disabled) { background: var(--danger-dark); }
+.btn-danger:disabled              { opacity: 0.55; cursor: not-allowed; }
+
+/* ─── Formularios ────────────────────────────────────────────────────────────── */
+.form-card {
+  background:    var(--bg-card);
+  border:        1px solid var(--border);
+  border-radius: 12px;
+  padding:       2rem;
+  box-shadow:    var(--shadow-sm);
+}
+
+.form-card h3 {
+  margin:        0 0 1.5rem;
+  font-size:     1.15rem;
+  font-weight:   700;
+  color:         var(--primary);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.form-group {
+  display:       flex;
+  flex-direction: column;
+  gap:           0.35rem;
+  margin-bottom: 1.1rem;
+}
+
+.form-group label {
+  font-size:   0.85rem;
+  font-weight: 600;
+  color:       var(--text);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  border:        1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding:       0.55rem 0.8rem;
+  font-size:     0.9rem;
+  color:         var(--text);
+  background:    var(--bg);
+  outline:       none;
+  transition:    border-color 0.15s;
+  font-family:   inherit;
+  width:         100%;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  border-color: var(--accent);
+}
+
+.form-group textarea {
+  resize:     vertical;
+  min-height: 80px;
+}
+
+.form-hint {
+  font-size: 0.78rem;
+  color:     var(--text-muted);
+}
+
+/* ─── Alertas ────────────────────────────────────────────────────────────────── */
+.alert {
+  display:       flex;
+  align-items:   flex-start;
+  gap:           0.5rem;
+  border-radius: var(--radius);
+  padding:       0.75rem 1rem;
+  font-size:     0.88rem;
+  margin:        1rem 1.5rem;
+}
+
+.alert-error {
+  background: #fef2f2;
+  border:     1px solid #fca5a5;
+  color:      #991b1b;
+}
+
+.alert-success {
+  background: #f0fdf4;
+  border:     1px solid #86efac;
+  color:      #166534;
+}
+
+.alert-warning {
+  background: #fffbeb;
+  border:     1px solid #fcd34d;
+  color:      #92400e;
+}
+
+.alert-info {
+  background: #eff6ff;
+  border:     1px solid #93c5fd;
+  color:      #1e40af;
+}
+
+/* ─── Tarjeta de resultado / certificado ─────────────────────────────────────── */
+.cert-card {
+  background:    var(--bg-card);
+  border:        1px solid var(--border);
+  border-radius: 12px;
+  padding:       1.5rem;
+  margin-top:    1.25rem;
+  box-shadow:    var(--shadow-sm);
+}
+
+.cert-card.cert-revocado {
+  border-color: #fca5a5;
+  background:   #fef2f2;
+}
+
+.cert-card.cert-valido {
+  border-color: #86efac;
+  background:   #f0fdf4;
+}
+
+.cert-header {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  margin-bottom:   1rem;
+  padding-bottom:  0.75rem;
+  border-bottom:   1px solid var(--border);
+}
+
+.cert-title {
+  font-size:   1rem;
+  font-weight: 700;
+  color:       var(--primary);
+  margin:      0;
+}
+
+.cert-field {
+  display:  flex;
+  gap:      0.5rem;
+  margin:   0.4rem 0;
+  font-size: 0.88rem;
+}
+
+.cert-field-label {
+  font-weight:  600;
+  color:        var(--text-muted);
+  min-width:    160px;
+  flex-shrink:  0;
+}
+
+.cert-field-value {
+  color:       var(--text);
+  word-break:  break-all;
+  font-family: monospace;
+}
+
+.cert-field-value.normal {
+  font-family: inherit;
+  word-break:  normal;
+}
+
+/* ─── Badges de estado ───────────────────────────────────────────────────────── */
+.badge {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           0.25rem;
+  font-size:     0.72rem;
+  font-weight:   700;
+  padding:       0.2rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-danger  { background: #fee2e2; color: #991b1b; }
+.badge-info    { background: #dbeafe; color: #1e40af; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-neutral { background: #f1f5f9; color: #475569; }
+
+/* ─── Loading spinner ────────────────────────────────────────────────────────── */
+.spinner {
+  width:  20px;
+  height: 20px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: var(--primary);
+  border-radius:    50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-row {
+  display:         flex;
+  justify-content: center;
+  align-items:     center;
+  gap:             0.75rem;
+  padding:         2rem;
+  color:           var(--text-muted);
+  font-size:       0.9rem;
+}
+
+/* ─── Hash display ───────────────────────────────────────────────────────────── */
+.hash-display {
+  font-family:     monospace;
+  font-size:       0.82rem;
+  background:      var(--bg);
+  border:          1px solid var(--border);
+  border-radius:   var(--radius);
+  padding:         0.4rem 0.7rem;
+  word-break:      break-all;
+  color:           var(--text-muted);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .tab-bar     { padding: 0 1rem; overflow-x: auto; }
+  .tab-btn     { padding: 0.75rem 0.9rem; font-size: 0.82rem; }
+  .tab-panel   { padding: 0 1rem; margin: 1.25rem auto; }
+  .form-card   { padding: 1.25rem; }
+  .welcome     { padding: 2rem 1rem; }
+  .welcome-card{ padding: 2rem 1.25rem; }
+  .cert-field  { flex-direction: column; }
+  .cert-field-label { min-width: auto; }
+}

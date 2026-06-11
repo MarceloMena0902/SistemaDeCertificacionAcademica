@@ -1,0 +1,394 @@
+{
+  "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "hashDocumento",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "codigo",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "estudiante",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        }
+      ],
+      "name": "CertificadoEmitido",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "hashDocumento",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "estudiante",
+          "type": "address"
+        }
+      ],
+      "name": "CertificadoFirmado",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "hashDocumento",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "motivo",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        }
+      ],
+      "name": "CertificadoRevocado",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        }
+      ],
+      "name": "EmisorAutorizado",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        }
+      ],
+      "name": "EmisorRevocado",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_emisor",
+          "type": "address"
+        }
+      ],
+      "name": "autorizarEmisor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "certificados",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "codigoCertificado",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "nombreEstudiante",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "estudianteWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fechaEmision",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "revocado",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "motivoRevocacion",
+          "type": "string"
+        },
+        {
+          "internalType": "bool",
+          "name": "firmadoPorEstudiante",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fechaFirmaEstudiante",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "certificadosPorEstudiante",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "emisoresAutorizados",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_hashDocumento",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "_codigo",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_nombre",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "_estudianteWallet",
+          "type": "address"
+        }
+      ],
+      "name": "emitirCertificado",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_hashDocumento",
+          "type": "bytes32"
+        }
+      ],
+      "name": "firmarRecepcion",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_estudiante",
+          "type": "address"
+        }
+      ],
+      "name": "obtenerCertificadosDeEstudiante",
+      "outputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "",
+          "type": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_hashDocumento",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "_motivo",
+          "type": "string"
+        }
+      ],
+      "name": "revocarCertificado",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_emisor",
+          "type": "address"
+        }
+      ],
+      "name": "revocarEmisor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_hashDocumento",
+          "type": "bytes32"
+        }
+      ],
+      "name": "verificarCertificado",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "codigoCertificado",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "nombreEstudiante",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "estudianteWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "emisor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fechaEmision",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "revocado",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "motivoRevocacion",
+          "type": "string"
+        },
+        {
+          "internalType": "bool",
+          "name": "firmadoPorEstudiante",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "fechaFirmaEstudiante",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}
