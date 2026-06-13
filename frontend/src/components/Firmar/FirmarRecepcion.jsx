@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useContract }                        from "../../hooks/useContract";
 import { useWeb3 }                            from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
+import { descargarCertificado }               from "../../utils/pdfGenerator";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -231,6 +232,20 @@ export default function FirmarRecepcion() {
     setProcesando(false);
   };
 
+  const handleDescargarPDF = () => {
+    if (!certData || !txHash) return;
+    descargarCertificado({
+      nombreEstudiante:     certData.nombreEstudiante,
+      codigoCertificado:    certData.codigoCertificado,
+      carrera:              "—",
+      fechaEmision:         formatFecha(certData.fechaEmision),
+      hashDocumento:        hashDocumento,
+      emisorWallet:         certData.emisor,
+      estudianteTxHash:     txHash,
+      fechaFirmaEstudiante: formatFecha(certData.fechaFirmaEstudiante),
+    });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const urlEtherscan = txHash ? etherscanTx(chainId, txHash) : null;
@@ -358,31 +373,51 @@ export default function FirmarRecepcion() {
 
       {/* ── Éxito de firma ── */}
       {txHash && (
-        <div className="alert alert-success" style={{ marginInline: 0, marginTop: "1rem" }}>
-          <div style={{ width: "100%" }}>
-            <strong>✅ Firma registrada en blockchain</strong>
-            <p style={{ marginTop: "0.4rem", fontSize: "0.85rem" }}>
-              Hash de transacción:{" "}
-              <code style={{ background: "rgba(0,0,0,0.06)", padding: "0.1rem 0.3rem", borderRadius: 4 }}>
-                {txHash.slice(0, 10)}...{txHash.slice(-8)}
-              </code>
-              {urlEtherscan ? (
-                <a
-                  href={urlEtherscan}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ marginLeft: "0.6rem", color: "var(--primary)", fontWeight: 600 }}
-                >
-                  Ver en Etherscan →
-                </a>
-              ) : (
-                <span style={{ marginLeft: "0.6rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                  (red local — Etherscan no disponible)
-                </span>
-              )}
-            </p>
+        <>
+          <div className="alert alert-success" style={{ marginInline: 0, marginTop: "1rem" }}>
+            <div style={{ width: "100%" }}>
+              <strong>✅ Firma registrada en blockchain</strong>
+              <p style={{ marginTop: "0.4rem", fontSize: "0.85rem" }}>
+                Hash de transacción:{" "}
+                <code style={{ background: "rgba(0,0,0,0.06)", padding: "0.1rem 0.3rem", borderRadius: 4 }}>
+                  {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                </code>
+                {urlEtherscan ? (
+                  <a
+                    href={urlEtherscan}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ marginLeft: "0.6rem", color: "var(--primary)", fontWeight: 600 }}
+                  >
+                    Ver en Etherscan →
+                  </a>
+                ) : (
+                  <span style={{ marginLeft: "0.6rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                    (red local — Etherscan no disponible)
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-        </div>
+
+          {/* ── Botón descargar PDF con ambas firmas ── */}
+          <div style={{
+            marginTop:    "1rem",
+            padding:      "0.9rem 1rem",
+            background:   "var(--bg)",
+            border:       "1px dashed var(--border)",
+            borderRadius: "var(--radius)",
+            textAlign:    "center",
+          }}>
+            <button
+              className="btn-secondary"
+              onClick={handleDescargarPDF}
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+            >
+              ⬇ Descargar PDF con ambas firmas
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

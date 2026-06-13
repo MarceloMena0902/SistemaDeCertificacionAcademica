@@ -29,6 +29,8 @@ const CLR = {
   grayBg:      [245, 245, 245],   // #f5f5f5
   borderLine:  [218, 218, 218],
   accent:      [201, 162,  39],   // dorado decorativo
+  green:       [22,  163,  74],   // firma confirmada
+  warning:     [180, 120,   0],   // firma pendiente
 };
 
 // ─── Helpers internos ────────────────────────────────────────────────────────
@@ -72,8 +74,11 @@ function _draw(doc, rgb) {
  * @param {string} [datos.universidad="Universidad Boliviana"]
  * @param {string} datos.fechaEmision  - fecha ya formateada (legible)
  * @param {string} datos.hashDocumento - bytes32 hex del documento original
- * @param {string} datos.emisorWallet  - dirección del emisor
- * @param {string} [datos.txHash]      - hash de la transacción (opcional)
+ * @param {string} datos.emisorWallet        - dirección del emisor
+ * @param {string} [datos.txHash]            - hash de tx de emisión (legacy)
+ * @param {string} [datos.emisorTxHash]      - hash de tx de emisión (preferido)
+ * @param {string} [datos.estudianteTxHash]  - hash de tx de firma del estudiante (opcional)
+ * @param {string} [datos.fechaFirmaEstudiante] - fecha legible de firma del estudiante (opcional)
  * @returns {jsPDF}
  */
 export function generarCertificadoPDF(datos) {
@@ -81,12 +86,18 @@ export function generarCertificadoPDF(datos) {
     nombreEstudiante,
     codigoCertificado,
     carrera,
-    universidad    = "Universidad Boliviana",
+    universidad          = "Universidad Boliviana",
     fechaEmision,
     hashDocumento,
     emisorWallet,
     txHash,
+    emisorTxHash,
+    estudianteTxHash,
+    fechaFirmaEstudiante,
   } = datos;
+
+  // emisorTxHash tiene prioridad; txHash es alias legacy
+  const _emisorTxHash = emisorTxHash || txHash || null;
 
   const doc = new jsPDF({
     orientation: "portrait",
@@ -222,31 +233,100 @@ export function generarCertificadoPDF(datos) {
     rowY += rowStep;
   });
 
-  // ── 9. SELLO / ESPACIO PARA FIRMA ─────────────────────────────────────────
+  // ── 9. REGISTRO DE FIRMAS DIGITALES ──────────────────────────────────────
 
-  const selloY = 180;
+  const sigY  = 178;
+  const sigW  = A4_W - 2 * (MARGIN + 2);
+  const sigX  = MARGIN + 2;
+  const sigH  = estudianteTxHash ? 72 : 68;
 
-  // Línea de firma izquierda
-  _draw(doc, CLR.primary);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN + 15, selloY, MARGIN + 70, selloY);
-  _text(doc, CLR.grayLight);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text("Autoridad Académica", MARGIN + 42, selloY + 5, { align: "center" });
+  // Fondo del recuadro
+  _fill(doc, CLR.grayBg);
+  doc.rect(sigX, sigY, sigW, sigH, "F");
 
-  // Línea de firma derecha
-  doc.line(A4_W - MARGIN - 70, selloY, A4_W - MARGIN - 15, selloY);
-  doc.text("Registro y Certificación", A4_W - MARGIN - 42, selloY + 5, { align: "center" });
+  // Borde izquierdo azul
+  _fill(doc, CLR.primary);
+  doc.rect(sigX, sigY, 2, sigH, "F");
 
-  // Texto de validez
-  _text(doc, CLR.gray);
-  doc.setFont("helvetica", "italic");
+  // Título de la sección
+  _text(doc, CLR.primaryDark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.text("REGISTRO DE FIRMAS DIGITALES", sigX + 7, sigY + 7);
+
+  // Separador
+  _draw(doc, CLR.borderLine);
+  doc.setLineWidth(0.2);
+  doc.line(sigX + 4, sigY + 10, sigX + sigW - 4, sigY + 10);
+
+  // ── 9a. Firma de Emisión ────────────────────────────────────────────────
+
+  const e1Y = sigY + 17;
+
+  _text(doc, CLR.green);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text(
-    "Este documento tiene validez jurídica respaldada por la tecnología blockchain.",
-    CENTER, selloY + 14, { align: "center" }
-  );
+  doc.text("✓ Firma de Emisión", sigX + 7, e1Y);
+
+  const dataLabelX = sigX + 12;
+  const dataValueX = sigX + 32;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+
+  _text(doc, CLR.grayLight);
+  doc.text("Emisor:",  dataLabelX, e1Y + 6);
+  doc.text("TX:",      dataLabelX, e1Y + 11);
+  doc.text("Fecha:",   dataLabelX, e1Y + 16);
+
+  _text(doc, CLR.black);
+  doc.setFont("courier", "normal");
+  doc.setFontSize(7);
+  doc.text(_abrevDir(emisorWallet),          dataValueX, e1Y + 6);
+  doc.text(_emisorTxHash ? _abrevHash(_emisorTxHash) : "—", dataValueX, e1Y + 11);
+  doc.setFont("helvetica", "normal");
+  doc.text(fechaEmision || "—",              dataValueX, e1Y + 16);
+
+  // Separador entre secciones
+  _draw(doc, CLR.borderLine);
+  doc.setLineWidth(0.15);
+  doc.line(sigX + 4, sigY + 38, sigX + sigW - 4, sigY + 38);
+
+  // ── 9b. Firma de Recepción del Estudiante ───────────────────────────────
+
+  const e2Y = sigY + 45;
+
+  if (estudianteTxHash) {
+    _text(doc, CLR.green);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("✓ Firma de Recepción del Estudiante", sigX + 7, e2Y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+
+    _text(doc, CLR.grayLight);
+    doc.text("TX:",     dataLabelX, e2Y + 6);
+    doc.text("Fecha:",  dataLabelX, e2Y + 11);
+
+    _text(doc, CLR.black);
+    doc.setFont("courier", "normal");
+    doc.setFontSize(7);
+    doc.text(_abrevHash(estudianteTxHash), dataValueX, e2Y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.text(fechaFirmaEstudiante || "—",  dataValueX, e2Y + 11);
+  } else {
+    _text(doc, CLR.warning);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("⏳ Firma de Recepción: PENDIENTE", sigX + 7, e2Y);
+
+    _text(doc, CLR.gray);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.text("El estudiante aún no ha firmado", sigX + 12, e2Y + 7);
+    doc.text("la recepción de este certificado.", sigX + 12, e2Y + 13);
+  }
 
   // ── 10. FOOTER — fondo gris claro ─────────────────────────────────────────
 
@@ -284,17 +364,6 @@ export function generarCertificadoPDF(datos) {
     "Verificación en línea: certchain.app",
     CENTER, footerY + 21, { align: "center" }
   );
-
-  // TX hash (opcional)
-  if (txHash) {
-    _text(doc, CLR.grayLight);
-    doc.setFont("courier", "normal");
-    doc.setFontSize(6.5);
-    doc.text(
-      `TX Blockchain: ${_abrevHash(txHash)}`,
-      CENTER, footerY + 27, { align: "center" }
-    );
-  }
 
   return doc;
 }

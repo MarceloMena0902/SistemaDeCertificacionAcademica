@@ -105,7 +105,8 @@ export default function EmitirCertificado() {
         fechaEmision:       formatFecha(),
         hashDocumento:      hashDocumento,
         emisorWallet:       account,
-        txHash:             data.hash,
+        emisorTxHash:       data.hash,
+        // estudianteTxHash omitido → se mostrará PENDIENTE en el PDF
       });
 
       setTxHash(data.hash);

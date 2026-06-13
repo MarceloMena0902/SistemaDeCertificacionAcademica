@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useContract }                        from "../../hooks/useContract";
+import { useWeb3 }                            from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
+import { descargarCertificado }               from "../../utils/pdfGenerator";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -113,6 +115,7 @@ function CertField({ label, value, mono = false, title }) {
 
 export default function VerificarCertificado() {
   const { verificarCertificado } = useContract();
+  const { contrato }             = useWeb3();
 
   const [modo,           setModo]           = useState("pdf");
   const [hashCalculado,  setHashCalculado]  = useState("");
@@ -121,6 +124,7 @@ export default function VerificarCertificado() {
   const [resultado,      setResultado]      = useState(null);
   const [buscando,       setBuscando]       = useState(false);
   const [errorBusqueda,  setErrorBusqueda]  = useState("");
+  const [descargando,    setDescargando]    = useState(false);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -166,6 +170,42 @@ export default function VerificarCertificado() {
       setResultado(data);
     }
     setBuscando(false);
+  };
+
+  const handleDescargarPDF = async () => {
+    if (!resultado || !resultado.exists) return;
+    setDescargando(true);
+
+    const hash = modo === "pdf" ? hashCalculado : hashManual.trim();
+
+    let estudianteTxHash;
+    if (resultado.firmadoPorEstudiante && contrato) {
+      try {
+        const eventos = await contrato.queryFilter(
+          contrato.filters.CertificadoFirmado(hash)
+        );
+        if (eventos.length > 0) {
+          estudianteTxHash = eventos[0].transactionHash;
+        }
+      } catch {
+        // si falla el query del evento, se omite el TX hash del estudiante
+      }
+    }
+
+    descargarCertificado({
+      nombreEstudiante:     resultado.nombreEstudiante,
+      codigoCertificado:    resultado.codigoCertificado,
+      carrera:              "—",
+      fechaEmision:         formatFecha(resultado.fechaEmision),
+      hashDocumento:        hash,
+      emisorWallet:         resultado.emisor,
+      estudianteTxHash,
+      fechaFirmaEstudiante: resultado.firmadoPorEstudiante
+        ? formatFecha(resultado.fechaFirmaEstudiante)
+        : undefined,
+    });
+
+    setDescargando(false);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -292,6 +332,36 @@ export default function VerificarCertificado() {
 
       {/* ── Resultado ── */}
       {resultado && <ResultadoVerificacion cert={resultado} />}
+
+      {/* ── Botón descargar PDF (siempre visible cuando hay resultado válido) ── */}
+      {resultado && resultado.exists && (
+        <div style={{
+          marginTop:    "1rem",
+          padding:      "0.9rem 1rem",
+          background:   "var(--bg)",
+          border:       "1px dashed var(--border)",
+          borderRadius: "var(--radius)",
+          textAlign:    "center",
+        }}>
+          <button
+            className="btn-secondary"
+            onClick={handleDescargarPDF}
+            disabled={descargando}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+          >
+            {descargando ? (
+              <>
+                <span className="spinner" />
+                Generando PDF…
+              </>
+            ) : resultado.firmadoPorEstudiante ? (
+              "⬇ Descargar PDF con ambas firmas"
+            ) : (
+              "⬇ Descargar PDF (firma pendiente)"
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
