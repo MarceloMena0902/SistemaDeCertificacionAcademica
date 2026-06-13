@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useContract }                                   from "../../hooks/useContract";
 import { useWeb3 }                                       from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay }            from "../../utils/hashUtils";
@@ -71,7 +71,7 @@ function PreviewCertificado({ cert }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function RevocarCertificado() {
-  const { chainId }                                   = useWeb3();
+  const { chainId, account }                          = useWeb3();
   const { verificarCertificado, revocarCertificado }  = useContract();
 
   // ── Modo ───────────────────────────────────────────────────────────────────
@@ -99,6 +99,23 @@ export default function RevocarCertificado() {
   const [procesando,  setProcesando]  = useState(false);
   const [txHash,      setTxHash]      = useState("");
   const [txError,     setTxError]     = useState("");
+
+  // ── Limpiar estado al cambiar de cuenta ────────────────────────────────────
+  useEffect(() => {
+    setModo("pdf");
+    setHashCalculado("");
+    setCalculandoHash(false);
+    setHashManual("");
+    setCertPreview(null);
+    setBuscando(false);
+    setErrorBusqueda("");
+    setMotivo("");
+    setErrorMotivo("");
+    setConfirmando(false);
+    setProcesando(false);
+    setTxHash("");
+    setTxError("");
+  }, [account]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

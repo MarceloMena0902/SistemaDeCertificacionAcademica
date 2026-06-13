@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useContract }  from "../../hooks/useContract";
 import { useWeb3 }      from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
@@ -103,7 +103,7 @@ function CertField({ label, value, mono = false, title }) {
 
 export default function VerificarCertificado() {
   const { verificarCertificado } = useContract();
-  const { contrato }             = useWeb3();
+  const { contrato, account }    = useWeb3();
 
   // ── Estado de modo ─────────────────────────────────────────────────────────
   const [modo, setModo] = useState("pdf"); // "pdf" | "hash"
@@ -120,8 +120,20 @@ export default function VerificarCertificado() {
   const [resultado,     setResultado]     = useState(null);
   const [buscando,      setBuscando]      = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
-  const [carrera,       setCarrera]       = useState("");
   const [descargando,   setDescargando]   = useState(false);
+
+  // ── Limpiar estado al cambiar de cuenta ────────────────────────────────────
+  useEffect(() => {
+    setModo("pdf");
+    setHashCalculado("");
+    setCalculandoHash(false);
+    setHashManual("");
+    setHashUsado("");
+    setResultado(null);
+    setBuscando(false);
+    setErrorBusqueda("");
+    setDescargando(false);
+  }, [account]);
 
   // ── Cambio de modo ─────────────────────────────────────────────────────────
   const cambiarModo = (m) => {
@@ -131,7 +143,6 @@ export default function VerificarCertificado() {
     setHashUsado("");
     setHashCalculado("");
     setHashManual("");
-    setCarrera("");
   };
 
   // ── Manejo del archivo PDF ─────────────────────────────────────────────────
@@ -170,7 +181,6 @@ export default function VerificarCertificado() {
 
     setResultado(null);
     setErrorBusqueda("");
-    setCarrera("");
     setBuscando(true);
     setHashUsado(hash);
 
@@ -185,10 +195,20 @@ export default function VerificarCertificado() {
     setBuscando(false);
   };
 
+  // ── Recuperar datos locales guardados al emitir ────────────────────────────
+  const recuperarDatosLocales = (hash) => {
+    const certificadosGuardados = JSON.parse(
+      localStorage.getItem("certchain_certificados") || "{}"
+    );
+    return certificadosGuardados[hash] || null;
+  };
+
   // ── Descargar PDF visual ───────────────────────────────────────────────────
   const handleDescargarPDF = async () => {
     if (!resultado || !resultado.exists) return;
     setDescargando(true);
+
+    const datosLocales = recuperarDatosLocales(hashUsado);
 
     let estudianteTxHash;
     if (resultado.firmadoPorEstudiante && contrato) {
@@ -197,23 +217,32 @@ export default function VerificarCertificado() {
           contrato.filters.CertificadoFirmado(hashUsado)
         );
         if (eventos.length > 0) estudianteTxHash = eventos[0].transactionHash;
-      } catch {
-        // Si falla el query del evento, se omite el TX hash del estudiante
+      } catch (e) {
+        console.error("Error obteniendo tx firma estudiante:", e);
       }
     }
 
     await descargarCertificado({
       nombreEstudiante:     resultado.nombreEstudiante,
       codigoCertificado:    resultado.codigoCertificado,
-      carrera:              carrera.trim(),
+      carrera:              datosLocales?.carrera || "Programa Académico",
       universidad:          "Universidad Boliviana",
-      fechaEmision:         formatFecha(resultado.fechaEmision),
+      fechaEmision:         new Date(Number(resultado.fechaEmision) * 1000)
+        .toLocaleDateString("es-ES", {
+          year: "numeric", month: "long", day: "numeric",
+        }),
       hashDocumento:        hashUsado,
       emisorWallet:         resultado.emisor,
+      emisorTxHash:         datosLocales?.emisorTxHash,
       estudianteTxHash,
       fechaFirmaEstudiante: resultado.firmadoPorEstudiante
-        ? formatFecha(resultado.fechaFirmaEstudiante)
+        ? new Date(Number(resultado.fechaFirmaEstudiante) * 1000)
+            .toLocaleDateString("es-ES", {
+              year: "numeric", month: "long", day: "numeric",
+            })
         : undefined,
+      firmaRector:          datosLocales?.firmaRector  || null,
+      firmaDirector:        datosLocales?.firmaDirector || null,
     });
 
     setDescargando(false);
@@ -340,28 +369,6 @@ export default function VerificarCertificado() {
         </div>
       )}
 
-      {/* ── Campo carrera para PDF (solo cuando existe el certificado) ── */}
-      {resultado && resultado.exists && (
-        <div className="form-group" style={{ marginTop: "1rem" }}>
-          <label htmlFor="carrera-verificar">
-            Carrera / Programa académico
-            <span style={{ color: "var(--color-text-muted)", fontWeight: 400, marginLeft: "0.4rem", fontSize: "0.82rem" }}>
-              (para el PDF descargable)
-            </span>
-          </label>
-          <input
-            id="carrera-verificar"
-            type="text"
-            placeholder="Ej: Ingeniería de Sistemas Informáticos"
-            value={carrera}
-            onChange={(e) => setCarrera(e.target.value)}
-          />
-          <span className="form-hint">
-            Este dato no se almacena en blockchain. Ingrésalo para que figure correctamente en el PDF.
-          </span>
-        </div>
-      )}
-
       {/* ── Botón descargar PDF visual ── */}
       {resultado && resultado.exists && (
         <div style={{
@@ -389,6 +396,15 @@ export default function VerificarCertificado() {
               "Descargar PDF (firma pendiente)"
             )}
           </button>
+          <p style={{
+            marginTop:  "0.6rem",
+            marginBottom: 0,
+            fontSize:   "0.78rem",
+            color:      "var(--color-text-muted)",
+            lineHeight: 1.5,
+          }}>
+            
+          </p>
         </div>
       )}
     </div>

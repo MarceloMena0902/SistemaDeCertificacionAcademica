@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Web3Provider, useWeb3 } from "./context/Web3Context";
 import Navbar                    from "./components/Layout/Navbar";
 import EmitirCertificado         from "./components/Emitir/EmitirCertificado";
@@ -11,11 +11,11 @@ import "./App.css";
 // ─── Definición de tabs ───────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "verificar", label: "Verificar",  roleRequired: false },
-  { id: "historial", label: "Historial",  roleRequired: false },
-  { id: "firmar",    label: "Firmar",     roleRequired: false },
-  { id: "emitir",    label: "Emitir",     roleRequired: true  },
-  { id: "revocar",   label: "Revocar",    roleRequired: true  },
+  { id: "verificar", label: "Verificar"                           },
+  { id: "historial", label: "Historial"                           },
+  { id: "firmar",    label: "Firmar",    soloEstudiante: true     },
+  { id: "emitir",    label: "Emitir",   roleRequired:   true     },
+  { id: "revocar",   label: "Revocar",  roleRequired:   true     },
 ];
 
 // ─── Contenido principal ──────────────────────────────────────────────────────
@@ -24,9 +24,21 @@ function AppContent() {
   const { isConnected, isOwner, isEmisor, error, conectarWallet } = useWeb3();
   const [tabActivo, setTabActivo] = useState("verificar");
 
-  const tabsVisibles = TABS.filter(
-    (tab) => !tab.roleRequired || isOwner || isEmisor
-  );
+  const tabsVisibles = TABS.filter((tab) => {
+    if (tab.roleRequired)   return isOwner || isEmisor;
+    if (tab.soloEstudiante) return !isOwner && !isEmisor;
+    return true;
+  });
+
+  // Resetear tab activo cuando cambia el rol (cambio de cuenta)
+  useEffect(() => {
+    if (!isConnected) return;
+    if (isOwner || isEmisor) {
+      setTabActivo("emitir");
+    } else {
+      setTabActivo("verificar");
+    }
+  }, [isOwner, isEmisor, isConnected]);
 
   const tabFinal = tabsVisibles.some((t) => t.id === tabActivo)
     ? tabActivo

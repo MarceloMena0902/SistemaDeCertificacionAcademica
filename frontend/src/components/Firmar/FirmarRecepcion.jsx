@@ -28,7 +28,7 @@ const esHashValido = (h) => /^0x[0-9a-fA-F]{64}$/.test(h);
 
 // ─── Sub-componente: preview del certificado ──────────────────────────────────
 
-function PreviewCertificado({ cert, account, carrera, setCarrera, errorCarrera, onFirmar, procesando }) {
+function PreviewCertificado({ cert, account, onFirmar, procesando }) {
   const mismaWallet =
     cert.estudianteWallet?.toLowerCase() === account?.toLowerCase();
 
@@ -86,30 +86,6 @@ function PreviewCertificado({ cert, account, carrera, setCarrera, errorCarrera, 
             <div className="alert alert-warning" style={{ marginInline: 0, marginBottom: "0.75rem" }}>
               Este certificado está pendiente de tu firma de recepción.
             </div>
-
-            {/* Campo carrera — requerido para firmar */}
-            <div className="form-group" style={{ marginBottom: "0.75rem" }}>
-              <label htmlFor="carrera-firmar">
-                Carrera / Programa académico
-                <span style={{ color: "var(--color-error)", marginLeft: "0.2rem" }}>*</span>
-              </label>
-              <input
-                id="carrera-firmar"
-                type="text"
-                placeholder="Ej: Ingeniería de Sistemas Informáticos"
-                value={carrera}
-                onChange={(e) => setCarrera(e.target.value)}
-              />
-              {errorCarrera && (
-                <span className="form-hint" style={{ color: "var(--danger)" }}>
-                  {errorCarrera}
-                </span>
-              )}
-              <span className="form-hint">
-                Ingresa la carrera tal como aparece en el certificado para que figure en el PDF.
-              </span>
-            </div>
-
             <button
               className="btn-primary"
               onClick={onFirmar}
@@ -175,9 +151,6 @@ export default function FirmarRecepcion() {
   const [buscando,      setBuscando]      = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
 
-  const [carrera,       setCarrera]       = useState("");
-  const [errorCarrera,  setErrorCarrera]  = useState("");
-
   const [procesando,    setProcesando]    = useState(false);
   const [txHash,        setTxHash]        = useState("");
   const [txError,       setTxError]       = useState("");
@@ -185,14 +158,26 @@ export default function FirmarRecepcion() {
   // Hash activo según el modo seleccionado
   const hashDocumento = modo === "pdf" ? hashCalculado : hashManual.trim();
 
+  // ── Limpiar estado al cambiar de cuenta ────────────────────────────────────
+  useEffect(() => {
+    setModo("pdf");
+    setHashCalculado("");
+    setCalculandoHash(false);
+    setHashManual("");
+    setCertData(null);
+    setBuscando(false);
+    setErrorBusqueda("");
+    setProcesando(false);
+    setTxHash("");
+    setTxError("");
+  }, [account]);
+
   // ── Auto-búsqueda cuando el hash activo es válido ──────────────────────────
   useEffect(() => {
     setCertData(null);
     setErrorBusqueda("");
     setTxHash("");
     setTxError("");
-    setCarrera("");
-    setErrorCarrera("");
 
     if (!esHashValido(hashDocumento)) return;
 
@@ -235,11 +220,6 @@ export default function FirmarRecepcion() {
   };
 
   const handleFirmar = async () => {
-    if (!carrera.trim()) {
-      setErrorCarrera("La carrera es requerida para generar el PDF del certificado.");
-      return;
-    }
-    setErrorCarrera("");
     setTxError("");
     setProcesando(true);
 
@@ -258,18 +238,34 @@ export default function FirmarRecepcion() {
     setProcesando(false);
   };
 
+  const recuperarDatosLocales = (hash) => {
+    const certificadosGuardados = JSON.parse(
+      localStorage.getItem("certchain_certificados") || "{}"
+    );
+    return certificadosGuardados[hash] || null;
+  };
+
   const handleDescargarPDF = async () => {
     if (!certData || !txHash) return;
+    const datosLocales = recuperarDatosLocales(hashDocumento);
     await descargarCertificado({
       nombreEstudiante:     certData.nombreEstudiante,
       codigoCertificado:    certData.codigoCertificado,
-      carrera:              carrera.trim(),
+      carrera:              datosLocales?.carrera || "Programa Académico",
       universidad:          "Universidad Boliviana",
-      fechaEmision:         formatFecha(certData.fechaEmision),
+      fechaEmision:         new Date(Number(certData.fechaEmision) * 1000)
+        .toLocaleDateString("es-ES", {
+          year: "numeric", month: "long", day: "numeric",
+        }),
       hashDocumento:        hashDocumento,
       emisorWallet:         certData.emisor,
+      emisorTxHash:         datosLocales?.emisorTxHash,
       estudianteTxHash:     txHash,
-      fechaFirmaEstudiante: formatFecha(certData.fechaFirmaEstudiante),
+      fechaFirmaEstudiante: new Date().toLocaleDateString("es-ES", {
+        year: "numeric", month: "long", day: "numeric",
+      }),
+      firmaRector:          datosLocales?.firmaRector  || null,
+      firmaDirector:        datosLocales?.firmaDirector || null,
     });
   };
 
@@ -381,14 +377,11 @@ export default function FirmarRecepcion() {
         </div>
       )}
 
-      {/* ── Preview + campo carrera + botón firmar ── */}
+      {/* ── Preview + botón firmar ── */}
       {certData && (
         <PreviewCertificado
           cert={certData}
           account={account}
-          carrera={carrera}
-          setCarrera={setCarrera}
-          errorCarrera={errorCarrera}
           onFirmar={handleFirmar}
           procesando={procesando}
         />

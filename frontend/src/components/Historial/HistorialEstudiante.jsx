@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { ethers }   from "ethers";
-import { useContract }       from "../../hooks/useContract";
-import { formatHashDisplay } from "../../utils/hashUtils";
+import { useState, useEffect } from "react";
+import { ethers }              from "ethers";
+import { useContract }         from "../../hooks/useContract";
+import { useWeb3 }             from "../../context/Web3Context";
+import { formatHashDisplay }   from "../../utils/hashUtils";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -121,12 +122,22 @@ function HistField({ label, value, mono = false, title }) {
 
 export default function HistorialEstudiante() {
   const { verificarCertificado, obtenerHistorial } = useContract();
+  const { account }                                = useWeb3();
 
   const [walletInput,   setWalletInput]   = useState("");
   const [certificados,  setCertificados]  = useState(null);
   const [buscando,      setBuscando]      = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
   const [expandidos,    setExpandidos]    = useState(new Set());
+
+  // Limpiar estado al cambiar de cuenta
+  useEffect(() => {
+    setWalletInput("");
+    setCertificados(null);
+    setBuscando(false);
+    setErrorBusqueda("");
+    setExpandidos(new Set());
+  }, [account]);
 
   const toggleExpandir = (hash) => {
     setExpandidos((prev) => {

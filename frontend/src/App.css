@@ -795,6 +795,84 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ══════════════════════════════════════════════════════════
+   DARK MODE — CORRECCIONES DE CONTRASTE
+   ══════════════════════════════════════════════════════════ */
+
+/* Alertas */
+[data-theme="dark"] .alert-error {
+  color: #F5A0A0;
+}
+
+/* Badges */
+[data-theme="dark"] .badge-success {
+  color:        #86EFAC;
+  background:   #1A2E1F;
+  border-color: #40916C;
+}
+
+[data-theme="dark"] .badge-danger {
+  color:        #F5A0A0;
+  background:   #2E1A1A;
+  border-color: #7B1D1D;
+}
+
+[data-theme="dark"] .badge-warning {
+  color:        #FBD38D;
+  background:   #2D2000;
+  border-color: #5A3D00;
+}
+
+/* Tarjetas de estado */
+[data-theme="dark"] .cert-valido {
+  background:   #152D1F;
+  border-color: #1E4530;
+}
+
+[data-theme="dark"] .cert-valido .cert-title {
+  color: #86EFAC;
+}
+
+[data-theme="dark"] .cert-revocado {
+  background:   #2D1515;
+  border-color: #5A2525;
+}
+
+[data-theme="dark"] .cert-revocado .cert-title {
+  color: #F5A0A0;
+}
+
+[data-theme="dark"] .cert-revocado .alert-error {
+  color: #F5A0A0;
+}
+
+/* Placeholder en inputs */
+[data-theme="dark"] .form-group input::placeholder,
+[data-theme="dark"] .form-group textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Botones secundarios */
+[data-theme="dark"] .btn-secondary {
+  border-color: var(--color-border);
+  color:        var(--color-text);
+}
+
+[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+  background:   var(--color-bg-subtle);
+  border-color: var(--color-primary-lighter);
+  color:        var(--color-primary-lighter);
+}
+
+/* Tabs no activos */
+[data-theme="dark"] .tab-btn {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .tab-btn:hover {
+  color: var(--color-primary-lighter);
+}
+
+/* ══════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {

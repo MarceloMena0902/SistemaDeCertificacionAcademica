@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { ethers }   from "ethers";
-import { useContract }       from "../../hooks/useContract";
-import { useWeb3 }           from "../../context/Web3Context";
+import { useState, useRef, useEffect } from "react";
+import { ethers }                       from "ethers";
+import SignaturePad                      from "signature_pad";
+import { useContract }                  from "../../hooks/useContract";
+import { useWeb3 }                      from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
 import { descargarCertificado }               from "../../utils/pdfGenerator";
 
@@ -22,7 +23,118 @@ const formatFecha = () =>
     year: "numeric", month: "long", day: "numeric",
   });
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Sub-componente: pad de firma auto-contenido ──────────────────────────────
+// Todos los refs y el useEffect viven DENTRO del componente para que el pad
+// solo se inicialice UNA VEZ al montar, sin re-ejecutarse por re-renders del padre.
+
+function FirmaPad({ label, onFirma, error }) {
+  const canvasRef = useRef(null);
+  const padRef    = useRef(null);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Ajustar resolución HiDPI UNA SOLA VEZ al montar
+    const ratio  = window.devicePixelRatio || 1;
+    const rect   = canvas.getBoundingClientRect();
+    const width  = rect.width  || 500;   // fallback si aún no está pintado
+    const height = rect.height || 150;
+
+    canvas.width  = width  * ratio;
+    canvas.height = height * ratio;
+    canvas.getContext("2d").scale(ratio, ratio);
+
+    // Inicializar SignaturePad DESPUÉS del resize
+    padRef.current = new SignaturePad(canvas, {
+      backgroundColor: "rgb(255,255,255)",
+      penColor:        "#1B4332",
+      minWidth:        1.5,
+      maxWidth:        3,
+    });
+
+    padRef.current.addEventListener("endStroke", () => {
+      if (!padRef.current.isEmpty()) {
+        onFirma(padRef.current.toDataURL("image/png"));
+      }
+    });
+
+    return () => {
+      padRef.current?.off();
+    };
+  }, []); // <- solo al montar; onFirma es setState (estable)
+
+  const limpiar = () => {
+    padRef.current?.clear();
+    onFirma(null);
+  };
+
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <label style={{
+        display:      "block",
+        fontSize:     "13px",
+        fontWeight:   "500",
+        color:        "var(--color-text-secondary)",
+        marginBottom: "6px",
+      }}>
+        {label} *
+      </label>
+      <div style={{
+        border:        "1.5px solid var(--color-border)",
+        borderRadius:  "6px",
+        background:    "#FFFFFF",
+        position:      "relative",
+        height:        "150px",
+      }}>
+        <canvas
+          ref={canvasRef}
+          style={{
+            width:        "100%",
+            height:       "150px",
+            cursor:       "crosshair",
+            display:      "block",
+            borderRadius: "6px",
+          }}
+        />
+        <button
+          type="button"
+          onClick={limpiar}
+          style={{
+            position:     "absolute",
+            top:          "8px",
+            right:        "8px",
+            background:   "transparent",
+            border:       "1px solid var(--color-border)",
+            borderRadius: "4px",
+            padding:      "4px 10px",
+            fontSize:     "12px",
+            cursor:       "pointer",
+            color:        "var(--color-text-secondary)",
+            zIndex:       10,
+          }}
+        >
+          Limpiar
+        </button>
+      </div>
+      <p style={{
+        fontSize:     "12px",
+        color:        "var(--color-text-muted)",
+        margin:       "4px 0 0 0",
+      }}>
+        Firme con el mouse o con el dedo en el área blanca
+      </p>
+      {error && (
+        <span style={{ color: "var(--color-error)", fontSize: "12px" }}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function EmitirCertificado() {
   const { chainId, account }           = useWeb3();
@@ -40,19 +152,37 @@ export default function EmitirCertificado() {
   const [wallet,  setWallet]  = useState("");
   const [errores, setErrores] = useState({});
 
+  // ── Datos de firmas (base64 PNG capturado por FirmaPad) ────────────────────
+  const [firmaRectorData,   setFirmaRectorData]   = useState(null);
+  const [firmaDirectorData, setFirmaDirectorData] = useState(null);
+  const [firmaPadKey,       setFirmaPadKey]       = useState(0);
+
   // ── Estado de resultado ────────────────────────────────────────────────────
   const [txHash,  setTxHash]  = useState("");
   const [txError, setTxError] = useState("");
+
+  // ── Limpiar estado al cambiar de cuenta ────────────────────────────────────
+  useEffect(() => {
+    setArchivoPDF(null);
+    setHashDocumento("");
+    setCalculandoHash(false);
+    setCodigo("");
+    setNombre("");
+    setCarrera("");
+    setWallet("");
+    setErrores({});
+    setFirmaRectorData(null);
+    setFirmaDirectorData(null);
+    setTxHash("");
+    setTxError("");
+    setFirmaPadKey((k) => k + 1); // remonta los pads (los vacía)
+  }, [account]);
 
   // ── Manejo del archivo PDF ─────────────────────────────────────────────────
 
   const handleFile = async (e) => {
     const file = e.target.files[0];
-    if (!file) {
-      setArchivoPDF(null);
-      setHashDocumento("");
-      return;
-    }
+    if (!file) { setArchivoPDF(null); setHashDocumento(""); return; }
 
     setArchivoPDF(file);
     setHashDocumento("");
@@ -73,14 +203,18 @@ export default function EmitirCertificado() {
 
   const validar = () => {
     const e = {};
-    if (!archivoPDF)     e.pdf    = "Selecciona el archivo PDF del certificado.";
-    if (!hashDocumento)  e.pdf    = e.pdf || "Espera a que se calcule el hash.";
+    if (!archivoPDF)     e.pdf     = "Selecciona el archivo PDF del certificado.";
+    if (!hashDocumento)  e.pdf     = e.pdf || "Espera a que se calcule el hash.";
     if (!codigo.trim())  e.codigo  = "El código del certificado es requerido.";
     if (!nombre.trim())  e.nombre  = "El nombre del estudiante es requerido.";
     if (!carrera.trim()) e.carrera = "La carrera es requerida.";
     if (!wallet.trim())  e.wallet  = "La wallet del estudiante es requerida.";
     else if (!ethers.isAddress(wallet.trim()))
                          e.wallet  = "Dirección Ethereum inválida.";
+
+    if (!firmaRectorData)   e.firmaRector   = "La firma del Rector es obligatoria.";
+    if (!firmaDirectorData) e.firmaDirector = "La firma del Director es obligatoria.";
+
     setErrores(e);
     return Object.keys(e).length === 0;
   };
@@ -98,10 +232,31 @@ export default function EmitirCertificado() {
       wallet.trim()
     );
 
-    if (error) {
-      setTxError(error);
-      return;
-    }
+    if (error) { setTxError(error); return; }
+
+    // Guardar datos del certificado en localStorage para recuperarlos
+    // al descargar el PDF desde FirmarRecepcion o VerificarCertificado
+    const datosCertificadoEmitido = {
+      codigoCertificado: codigo.trim(),
+      nombreEstudiante:  nombre.trim(),
+      carrera:           carrera.trim(),
+      firmaRector:       firmaRectorData,
+      firmaDirector:     firmaDirectorData,
+      emisorTxHash:      data.hash,
+      fechaEmision:      new Date().toLocaleDateString("es-ES", {
+        year: "numeric", month: "long", day: "numeric",
+      }),
+      emisorWallet:      account,
+      hashDocumento:     hashDocumento,
+    };
+    const certificadosGuardados = JSON.parse(
+      localStorage.getItem("certchain_certificados") || "{}"
+    );
+    certificadosGuardados[hashDocumento] = datosCertificadoEmitido;
+    localStorage.setItem(
+      "certchain_certificados",
+      JSON.stringify(certificadosGuardados)
+    );
 
     setTxHash(data.hash);
   };
@@ -109,6 +264,8 @@ export default function EmitirCertificado() {
   // ── Descarga del PDF visual ────────────────────────────────────────────────
 
   const handleDescargarPDF = async () => {
+    console.log("firmaRector:",   firmaRectorData   ? "OK" : "NULL");
+    console.log("firmaDirector:", firmaDirectorData ? "OK" : "NULL");
     await descargarCertificado({
       nombreEstudiante:  nombre.trim(),
       codigoCertificado: codigo.trim(),
@@ -118,6 +275,10 @@ export default function EmitirCertificado() {
       hashDocumento,
       emisorWallet:      account,
       emisorTxHash:      txHash,
+      estudianteTxHash:  undefined,
+      fechaFirmaEstudiante: undefined,
+      firmaRector:       firmaRectorData,
+      firmaDirector:     firmaDirectorData,
     });
   };
 
@@ -127,13 +288,14 @@ export default function EmitirCertificado() {
     setArchivoPDF(null); setHashDocumento(""); setCalculandoHash(false);
     setCodigo(""); setNombre(""); setCarrera(""); setWallet("");
     setErrores({}); setTxHash(""); setTxError("");
+    setFirmaRectorData(null); setFirmaDirectorData(null);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const urlEtherscan = txHash ? etherscanTx(chainId, txHash) : null;
 
-  // ══ Éxito: certificado emitido ════════════════════════════════════════════
+  // ══ Éxito ════════════════════════════════════════════════════════════════
   if (txHash) {
     return (
       <div className="form-card">
@@ -167,9 +329,7 @@ export default function EmitirCertificado() {
 
         <div className="form-group" style={{ marginTop: "1rem" }}>
           <label>Hash del certificado registrado</label>
-          <div className="hash-display" title={hashDocumento}>
-            {hashDocumento}
-          </div>
+          <div className="hash-display" title={hashDocumento}>{hashDocumento}</div>
           <span className="form-hint">
             Este hash identifica el PDF original. Cualquier persona puede verificarlo
             subiendo el mismo archivo en la sección <em>Verificar</em>.
@@ -185,7 +345,7 @@ export default function EmitirCertificado() {
           textAlign:    "center",
         }}>
           <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
-            Genera un PDF visual del certificado con el hash y datos de emisión.
+            El PDF oficial incluye las firmas manuscritas del Rector y del Director.
             <br />
             <span style={{ fontSize: "0.78rem" }}>
               El estudiante debe recibir el PDF original para poder verificar y firmar su recepción.
@@ -194,7 +354,6 @@ export default function EmitirCertificado() {
           <button
             className="btn-primary"
             onClick={handleDescargarPDF}
-            style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
           >
             Descargar PDF del Certificado
           </button>
@@ -211,13 +370,13 @@ export default function EmitirCertificado() {
     );
   }
 
-  // ══ Formulario ═══════════════════════════════════════════════════════════
+  // ══ Formulario ══════════════════════════════════════════════════════════════
   return (
     <div className="form-card">
       <h3>Emitir Certificado Académico</h3>
       <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
-        Sube el PDF del certificado y completa los datos. El hash SHA-256 del archivo
-        quedará registrado en blockchain como prueba de autenticidad.
+        Sube el PDF del certificado, completa los datos y firma digitalmente.
+        El hash SHA-256 del archivo quedará registrado en blockchain como prueba de autenticidad.
       </p>
 
       {/* ── PDF ── */}
@@ -243,9 +402,7 @@ export default function EmitirCertificado() {
           </span>
         )}
         {errores.pdf && (
-          <span className="form-hint" style={{ color: "var(--danger)" }}>
-            {errores.pdf}
-          </span>
+          <span className="form-hint" style={{ color: "var(--danger)" }}>{errores.pdf}</span>
         )}
       </div>
 
@@ -260,9 +417,7 @@ export default function EmitirCertificado() {
           onChange={(e) => setCodigo(e.target.value)}
         />
         {errores.codigo && (
-          <span className="form-hint" style={{ color: "var(--danger)" }}>
-            {errores.codigo}
-          </span>
+          <span className="form-hint" style={{ color: "var(--danger)" }}>{errores.codigo}</span>
         )}
       </div>
 
@@ -277,9 +432,7 @@ export default function EmitirCertificado() {
           onChange={(e) => setNombre(e.target.value)}
         />
         {errores.nombre && (
-          <span className="form-hint" style={{ color: "var(--danger)" }}>
-            {errores.nombre}
-          </span>
+          <span className="form-hint" style={{ color: "var(--danger)" }}>{errores.nombre}</span>
         )}
       </div>
 
@@ -294,9 +447,7 @@ export default function EmitirCertificado() {
           onChange={(e) => setCarrera(e.target.value)}
         />
         {errores.carrera && (
-          <span className="form-hint" style={{ color: "var(--danger)" }}>
-            {errores.carrera}
-          </span>
+          <span className="form-hint" style={{ color: "var(--danger)" }}>{errores.carrera}</span>
         )}
       </div>
 
@@ -314,14 +465,38 @@ export default function EmitirCertificado() {
           }}
         />
         {errores.wallet ? (
-          <span className="form-hint" style={{ color: "var(--danger)" }}>
-            {errores.wallet}
-          </span>
+          <span className="form-hint" style={{ color: "var(--danger)" }}>{errores.wallet}</span>
         ) : (
           <span className="form-hint">
             Dirección Ethereum de la wallet del estudiante (formato 0x…).
           </span>
         )}
+      </div>
+
+      {/* ── Firmas institucionales ── */}
+      <div style={{
+        borderTop:    "1px solid var(--color-border)",
+        marginTop:    "0.5rem",
+        paddingTop:   "1.25rem",
+        marginBottom: "0.5rem",
+      }}>
+        <p style={{ fontSize: "0.88rem", color: "var(--color-text-secondary)", marginBottom: "1rem" }}>
+          Firmas institucionales — dibuje cada firma con el mouse o con el dedo
+        </p>
+
+        <FirmaPad
+          key={`rector-${firmaPadKey}`}
+          label="Firma del Rector"
+          onFirma={setFirmaRectorData}
+          error={errores.firmaRector}
+        />
+
+        <FirmaPad
+          key={`director-${firmaPadKey}`}
+          label="Firma del Director del Programa"
+          onFirma={setFirmaDirectorData}
+          error={errores.firmaDirector}
+        />
       </div>
 
       {txError && (

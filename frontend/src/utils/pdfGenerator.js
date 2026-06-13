@@ -75,6 +75,8 @@ export async function generarCertificadoPDF(datos) {
     emisorTxHash,
     estudianteTxHash,
     fechaFirmaEstudiante,
+    firmaRector   = null,
+    firmaDirector = null,
   } = datos;
 
   const _emisorTxHash = emisorTxHash || txHash || null;
@@ -339,28 +341,44 @@ export async function generarCertificadoPDF(datos) {
   doc.setFontSize(5);
   doc.text("OFICIAL", CENTER, 184.8, { align: "center" });
 
-  // ── Líneas de firma ───────────────────────────────────────────────────
+  // ── Firmas manuscritas o líneas vacías ───────────────────────────────
+  if (firmaRector && typeof firmaRector === "string" && firmaRector.startsWith("data:image")) {
+    try {
+      doc.addImage(firmaRector, "PNG", 25, 175, 60, 18);
+    } catch (e) {
+      console.error("Error agregando firma rector:", e);
+    }
+  }
+  if (firmaDirector && typeof firmaDirector === "string" && firmaDirector.startsWith("data:image")) {
+    try {
+      doc.addImage(firmaDirector, "PNG", 120, 175, 60, 18);
+    } catch (e) {
+      console.error("Error agregando firma director:", e);
+    }
+  }
+
+  // Líneas de firma (siempre visibles, debajo de la imagen si existe)
   _draw(doc, CLR.primary);
   doc.setLineWidth(0.4);
-  doc.line(30,  192, 90,  192);   // bloque izquierdo (Rector)
-  doc.line(120, 192, 180, 192);   // bloque derecho (Director)
+  doc.line(25,  195, 85,  195);   // bloque izquierdo (Rector)
+  doc.line(120, 195, 180, 195);   // bloque derecho (Director)
 
   // Bloque izquierdo
   _text(doc, CLR.primary);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("Rector", 60, 197, { align: "center" });
+  doc.text("Rector", 60, 203, { align: "center" });
 
   _text(doc, CLR.gray);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Universidad Boliviana", 60, 202, { align: "center" });
+  doc.text("Universidad Boliviana", 60, 209, { align: "center" });
 
   // Bloque derecho
   _text(doc, CLR.primary);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("Director del Programa", 150, 197, { align: "center" });
+  doc.text("Director del Programa", 150, 203, { align: "center" });
 
   _text(doc, CLR.gray);
   doc.setFont("helvetica", "normal");
@@ -368,7 +386,7 @@ export async function generarCertificadoPDF(datos) {
   const carreraCorta = (carrera || "").length > 30
     ? (carrera || "").slice(0, 28) + "…"
     : (carrera || "");
-  doc.text(carreraCorta, 150, 202, { align: "center" });
+  doc.text(carreraCorta, 150, 209, { align: "center" });
 
   // ══════════════════════════════════════════════════════════════════════════
   // 10. FOOTER — fondo gris claro
