@@ -11,11 +11,11 @@ import "./App.css";
 // ─── Definición de tabs ───────────────────────────────────────────────────────
 
 const TABS = [
-  { id: "verificar", label: "🔍 Verificar",  roleRequired: false },
-  { id: "historial", label: "📋 Historial",  roleRequired: false },
-  { id: "firmar",    label: "✍️ Firmar",     roleRequired: false },
-  { id: "emitir",    label: "📄 Emitir",     roleRequired: true  },
-  { id: "revocar",   label: "🚫 Revocar",    roleRequired: true  },
+  { id: "verificar", label: "Verificar",  roleRequired: false },
+  { id: "historial", label: "Historial",  roleRequired: false },
+  { id: "firmar",    label: "Firmar",     roleRequired: false },
+  { id: "emitir",    label: "Emitir",     roleRequired: true  },
+  { id: "revocar",   label: "Revocar",    roleRequired: true  },
 ];
 
 // ─── Contenido principal ──────────────────────────────────────────────────────
@@ -24,12 +24,10 @@ function AppContent() {
   const { isConnected, isOwner, isEmisor, error, conectarWallet } = useWeb3();
   const [tabActivo, setTabActivo] = useState("verificar");
 
-  // Mostrar solo los tabs accesibles para el rol actual
   const tabsVisibles = TABS.filter(
     (tab) => !tab.roleRequired || isOwner || isEmisor
   );
 
-  // Si el tab activo quedó fuera de los visibles (ej: cambio de cuenta), volver al primero
   const tabFinal = tabsVisibles.some((t) => t.id === tabActivo)
     ? tabActivo
     : (tabsVisibles[0]?.id ?? "verificar");
@@ -39,16 +37,14 @@ function AppContent() {
       <Navbar />
 
       <main className="app-main">
-        {/* Error global de wallet */}
         {error && (
           <div className="alert alert-error" role="alert">
-            <span>⚠️</span> {error}
+            {error}
           </div>
         )}
 
         {isConnected ? (
           <>
-            {/* Barra de tabs */}
             <nav className="tab-bar" role="tablist">
               {tabsVisibles.map((tab) => (
                 <button
@@ -63,7 +59,6 @@ function AppContent() {
               ))}
             </nav>
 
-            {/* Panel activo */}
             <section className="tab-panel" role="tabpanel">
               {tabFinal === "verificar" && <VerificarCertificado />}
               {tabFinal === "historial" && <HistorialEstudiante />}
@@ -73,28 +68,27 @@ function AppContent() {
             </section>
           </>
         ) : (
-          /* Pantalla de bienvenida */
           <div className="welcome">
             <div className="welcome-card">
-              <span className="welcome-icon">🎓</span>
+              <span className="welcome-mark" aria-hidden="true" />
               <h2 className="welcome-title">CertChain</h2>
               <p className="welcome-subtitle">
-                Sistema descentralizado de certificación académica en Ethereum
+                Sistema de certificación académica en Ethereum
               </p>
 
               <ul className="feature-list">
-                <li>📄 Emite certificados inmutables en la blockchain</li>
-                <li>🔍 Verifica la autenticidad de cualquier certificado</li>
-                <li>✍️ Firma digitalmente la recepción de tu título</li>
-                <li>📋 Consulta el historial completo por estudiante</li>
+                <li>Emisión inmutable de certificados en blockchain</li>
+                <li>Verificación descentralizada de autenticidad</li>
+                <li>Firma digital de recepción por el estudiante</li>
+                <li>Historial completo de certificados por wallet</li>
               </ul>
 
               <button className="btn-primary btn-lg" onClick={conectarWallet}>
-                Conectar MetaMask para comenzar
+                Conectar MetaMask
               </button>
 
               <p className="welcome-note">
-                Asegúrate de tener MetaMask instalado y estar en la red correcta.
+                Requiere MetaMask instalado y conexión a la red configurada.
               </p>
             </div>
           </div>

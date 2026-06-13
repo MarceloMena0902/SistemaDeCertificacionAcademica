@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { useContract }                        from "../../hooks/useContract";
-import { useWeb3 }                            from "../../context/Web3Context";
+import { useContract }  from "../../hooks/useContract";
+import { useWeb3 }      from "../../context/Web3Context";
 import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
-import { descargarCertificado }               from "../../utils/pdfGenerator";
+import { descargarCertificado } from "../../utils/pdfGenerator";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
-const formatFecha = (ts) =>
-  ts
-    ? new Date(Number(ts) * 1000).toLocaleDateString("es-ES", {
-        year: "numeric", month: "long", day: "numeric",
-      })
-    : "—";
+const formatFecha = (ts) => {
+  if (!ts) return "—";
+  const ms = Number(ts) < 1e12 ? Number(ts) * 1000 : Number(ts);
+  return new Date(ms).toLocaleDateString("es-ES", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+};
 
 const abreviarDir = (addr) =>
   addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "—";
@@ -22,15 +23,12 @@ function ResultadoVerificacion({ cert }) {
   if (!cert.exists) {
     return (
       <div className="cert-card" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.75rem" }}>
-          <span style={{ fontSize: "1.4rem" }}>⚠️</span>
-          <strong style={{ color: "var(--text-muted)", fontSize: "1rem" }}>
-            CERTIFICADO NO ENCONTRADO
-          </strong>
-        </div>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-          Este documento no está registrado en la blockchain. Puede que el hash
-          no corresponda a un certificado emitido, o que el archivo haya sido modificado.
+        <strong style={{ color: "var(--text-muted)", fontSize: "1rem" }}>
+          CERTIFICADO NO ENCONTRADO
+        </strong>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
+          Este certificado no está registrado en la blockchain. Verifica que el archivo
+          PDF sea el original sin modificaciones.
         </p>
       </div>
     );
@@ -40,10 +38,7 @@ function ResultadoVerificacion({ cert }) {
     return (
       <div className="cert-card cert-revocado">
         <div className="cert-header">
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <span style={{ fontSize: "1.3rem" }}>❌</span>
-            <span className="cert-title">CERTIFICADO REVOCADO</span>
-          </div>
+          <span className="cert-title">CERTIFICADO REVOCADO</span>
           <span className="badge badge-danger">Revocado</span>
         </div>
 
@@ -56,14 +51,10 @@ function ResultadoVerificacion({ cert }) {
     );
   }
 
-  // Válido
   return (
     <div className="cert-card cert-valido">
       <div className="cert-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <span style={{ fontSize: "1.3rem" }}>✅</span>
-          <span className="cert-title">CERTIFICADO VÁLIDO</span>
-        </div>
+        <span className="cert-title">CERTIFICADO VÁLIDO</span>
         <span className="badge badge-success">Válido</span>
       </div>
 
@@ -72,7 +63,6 @@ function ResultadoVerificacion({ cert }) {
   );
 }
 
-/** Tabla de campos compartida entre válido y revocado. */
 function CertFields({ cert }) {
   return (
     <div>
@@ -85,15 +75,13 @@ function CertFields({ cert }) {
       {cert.firmadoPorEstudiante ? (
         <CertField
           label="Firma del estudiante"
-          value={`✍️ Firmado el ${formatFecha(cert.fechaFirmaEstudiante)}`}
+          value={`Firmado el ${formatFecha(cert.fechaFirmaEstudiante)}`}
           mono={false}
         />
       ) : (
         <div className="cert-field">
           <span className="cert-field-label">Firma del estudiante</span>
-          <span>
-            <span className="badge badge-warning">⏳ Pendiente de firma del estudiante</span>
-          </span>
+          <span className="badge badge-warning">Pendiente de firma del estudiante</span>
         </div>
       )}
     </div>
@@ -117,42 +105,64 @@ export default function VerificarCertificado() {
   const { verificarCertificado } = useContract();
   const { contrato }             = useWeb3();
 
-  const [modo,           setModo]           = useState("pdf");
+  // ── Estado de modo ─────────────────────────────────────────────────────────
+  const [modo, setModo] = useState("pdf"); // "pdf" | "hash"
+
+  // ── Modo PDF ───────────────────────────────────────────────────────────────
   const [hashCalculado,  setHashCalculado]  = useState("");
   const [calculandoHash, setCalculandoHash] = useState(false);
-  const [hashManual,     setHashManual]     = useState("");
-  const [resultado,      setResultado]      = useState(null);
-  const [buscando,       setBuscando]       = useState(false);
-  const [errorBusqueda,  setErrorBusqueda]  = useState("");
-  const [descargando,    setDescargando]    = useState(false);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  // ── Modo Hash ──────────────────────────────────────────────────────────────
+  const [hashManual, setHashManual] = useState("");
 
+  // ── Estado compartido ──────────────────────────────────────────────────────
+  const [hashUsado,     setHashUsado]     = useState("");
+  const [resultado,     setResultado]     = useState(null);
+  const [buscando,      setBuscando]      = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+  const [carrera,       setCarrera]       = useState("");
+  const [descargando,   setDescargando]   = useState(false);
+
+  // ── Cambio de modo ─────────────────────────────────────────────────────────
+  const cambiarModo = (m) => {
+    setModo(m);
+    setResultado(null);
+    setErrorBusqueda("");
+    setHashUsado("");
+    setHashCalculado("");
+    setHashManual("");
+    setCarrera("");
+  };
+
+  // ── Manejo del archivo PDF ─────────────────────────────────────────────────
   const handleFile = async (e) => {
     const file = e.target.files[0];
-    if (!file) { setHashCalculado(""); return; }
-
     setHashCalculado("");
     setResultado(null);
     setErrorBusqueda("");
-    setCalculandoHash(true);
+    setHashUsado("");
 
+    if (!file) return;
+
+    setCalculandoHash(true);
     try {
       const hash = await calcularHashPDF(file);
       setHashCalculado(hash);
     } catch {
-      setErrorBusqueda("No se pudo calcular el hash del archivo.");
+      setErrorBusqueda("No se pudo calcular el hash del archivo PDF.");
     } finally {
       setCalculandoHash(false);
     }
   };
 
+  // ── Verificar ──────────────────────────────────────────────────────────────
   const handleVerificar = async () => {
     const hash = modo === "pdf" ? hashCalculado : hashManual.trim();
+
     if (!hash) {
       setErrorBusqueda(
         modo === "pdf"
-          ? "Primero selecciona un archivo PDF."
+          ? "Selecciona un archivo PDF primero."
           : "Ingresa el hash del certificado."
       );
       return;
@@ -160,7 +170,9 @@ export default function VerificarCertificado() {
 
     setResultado(null);
     setErrorBusqueda("");
+    setCarrera("");
     setBuscando(true);
+    setHashUsado(hash);
 
     const { data, error } = await verificarCertificado(hash);
 
@@ -169,35 +181,34 @@ export default function VerificarCertificado() {
     } else {
       setResultado(data);
     }
+
     setBuscando(false);
   };
 
+  // ── Descargar PDF visual ───────────────────────────────────────────────────
   const handleDescargarPDF = async () => {
     if (!resultado || !resultado.exists) return;
     setDescargando(true);
-
-    const hash = modo === "pdf" ? hashCalculado : hashManual.trim();
 
     let estudianteTxHash;
     if (resultado.firmadoPorEstudiante && contrato) {
       try {
         const eventos = await contrato.queryFilter(
-          contrato.filters.CertificadoFirmado(hash)
+          contrato.filters.CertificadoFirmado(hashUsado)
         );
-        if (eventos.length > 0) {
-          estudianteTxHash = eventos[0].transactionHash;
-        }
+        if (eventos.length > 0) estudianteTxHash = eventos[0].transactionHash;
       } catch {
-        // si falla el query del evento, se omite el TX hash del estudiante
+        // Si falla el query del evento, se omite el TX hash del estudiante
       }
     }
 
     await descargarCertificado({
       nombreEstudiante:     resultado.nombreEstudiante,
       codigoCertificado:    resultado.codigoCertificado,
-      carrera:              "—",
+      carrera:              carrera.trim(),
+      universidad:          "Universidad Boliviana",
       fechaEmision:         formatFecha(resultado.fechaEmision),
-      hashDocumento:        hash,
+      hashDocumento:        hashUsado,
       emisorWallet:         resultado.emisor,
       estudianteTxHash,
       fechaFirmaEstudiante: resultado.firmadoPorEstudiante
@@ -212,13 +223,17 @@ export default function VerificarCertificado() {
 
   return (
     <div className="form-card">
-      <h3>🔍 Verificar Certificado</h3>
+      <h3>Verificar Certificado</h3>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
+        Sube el PDF oficial del certificado para verificar su autenticidad, o ingresa
+        el hash directamente si lo tienes disponible.
+      </p>
 
       {/* ── Selector de modo ── */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
         {[
-          { id: "pdf",  label: "📄 Verificar por PDF"  },
-          { id: "hash", label: "🔑 Verificar por Hash" },
+          { id: "pdf",  label: "Verificar por PDF"  },
+          { id: "hash", label: "Verificar por Hash" },
         ].map(({ id, label }) => (
           <label
             key={id}
@@ -230,7 +245,7 @@ export default function VerificarCertificado() {
               padding:       "0.45rem 0.9rem",
               borderRadius:  "var(--radius)",
               border:        `1.5px solid ${modo === id ? "var(--primary)" : "var(--border)"}`,
-              background:    modo === id ? "#eff6ff" : "var(--bg)",
+              background:    modo === id ? "var(--color-active-bg)" : "var(--bg)",
               color:         modo === id ? "var(--primary)" : "var(--text-muted)",
               fontWeight:    modo === id ? 700 : 400,
               fontSize:      "0.88rem",
@@ -242,11 +257,7 @@ export default function VerificarCertificado() {
               name="modo"
               value={id}
               checked={modo === id}
-              onChange={() => {
-                setModo(id);
-                setResultado(null);
-                setErrorBusqueda("");
-              }}
+              onChange={() => cambiarModo(id)}
               style={{ display: "none" }}
             />
             {label}
@@ -254,41 +265,33 @@ export default function VerificarCertificado() {
         ))}
       </div>
 
-      {/* ── Modo PDF ── */}
+      {/* ══ MODO: Verificar por PDF ══ */}
       {modo === "pdf" && (
         <div className="form-group">
-          <label htmlFor="pdf-verificar">Selecciona el archivo PDF original</label>
+          <label htmlFor="pdf-verificar">Archivo PDF del certificado</label>
           <input
             id="pdf-verificar"
             type="file"
             accept=".pdf,application/pdf"
             onChange={handleFile}
           />
-          <span className="form-hint">
-            Se calculará el hash del archivo y se buscará en la blockchain.
-          </span>
-
           {calculandoHash && (
             <div className="loading-row" style={{ justifyContent: "flex-start", paddingLeft: 0 }}>
-              <span className="spinner" />
-              Calculando hash…
+              <span className="spinner" /> Calculando hash SHA-256…
             </div>
           )}
-
           {hashCalculado && (
-            <div style={{ marginTop: "0.6rem" }}>
-              <span className="form-hint">
-                Hash calculado:{" "}
-                <strong style={{ fontFamily: "monospace" }}>
-                  {formatHashDisplay(hashCalculado)}
-                </strong>
-              </span>
-            </div>
+            <span className="form-hint">
+              Hash calculado:{" "}
+              <strong style={{ fontFamily: "monospace" }}>
+                {formatHashDisplay(hashCalculado)}
+              </strong>
+            </span>
           )}
         </div>
       )}
 
-      {/* ── Modo Hash manual ── */}
+      {/* ══ MODO: Verificar por Hash ══ */}
       {modo === "hash" && (
         <div className="form-group">
           <label htmlFor="hash-input">Hash SHA-256 del certificado (bytes32)</label>
@@ -301,7 +304,7 @@ export default function VerificarCertificado() {
             style={{ fontFamily: "monospace", fontSize: "0.85rem" }}
           />
           <span className="form-hint">
-            Pega el hash de 66 caracteres que empieza con 0x.
+            Pega el hash de 66 caracteres que empieza con 0x (visible en el PDF o en la tx de emisión).
           </span>
         </div>
       )}
@@ -326,14 +329,40 @@ export default function VerificarCertificado() {
       {/* ── Error ── */}
       {errorBusqueda && (
         <div className="alert alert-error" style={{ marginTop: "1rem", marginInline: 0 }}>
-          <span>⚠️</span> {errorBusqueda}
+          {errorBusqueda}
         </div>
       )}
 
       {/* ── Resultado ── */}
-      {resultado && <ResultadoVerificacion cert={resultado} />}
+      {resultado && (
+        <div style={{ marginTop: "1.25rem" }}>
+          <ResultadoVerificacion cert={resultado} />
+        </div>
+      )}
 
-      {/* ── Botón descargar PDF (siempre visible cuando hay resultado válido) ── */}
+      {/* ── Campo carrera para PDF (solo cuando existe el certificado) ── */}
+      {resultado && resultado.exists && (
+        <div className="form-group" style={{ marginTop: "1rem" }}>
+          <label htmlFor="carrera-verificar">
+            Carrera / Programa académico
+            <span style={{ color: "var(--color-text-muted)", fontWeight: 400, marginLeft: "0.4rem", fontSize: "0.82rem" }}>
+              (para el PDF descargable)
+            </span>
+          </label>
+          <input
+            id="carrera-verificar"
+            type="text"
+            placeholder="Ej: Ingeniería de Sistemas Informáticos"
+            value={carrera}
+            onChange={(e) => setCarrera(e.target.value)}
+          />
+          <span className="form-hint">
+            Este dato no se almacena en blockchain. Ingrésalo para que figure correctamente en el PDF.
+          </span>
+        </div>
+      )}
+
+      {/* ── Botón descargar PDF visual ── */}
       {resultado && resultado.exists && (
         <div style={{
           marginTop:    "1rem",
@@ -355,9 +384,9 @@ export default function VerificarCertificado() {
                 Generando PDF…
               </>
             ) : resultado.firmadoPorEstudiante ? (
-              "⬇ Descargar PDF con ambas firmas"
+              "Descargar PDF con ambas firmas"
             ) : (
-              "⬇ Descargar PDF (firma pendiente)"
+              "Descargar PDF (firma pendiente)"
             )}
           </button>
         </div>

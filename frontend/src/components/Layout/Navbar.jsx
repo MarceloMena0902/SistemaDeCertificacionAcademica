@@ -1,96 +1,37 @@
+import { useState, useEffect } from "react";
 import { useWeb3 } from "../../context/Web3Context";
 
-// ─── Paleta de colores ────────────────────────────────────────────────────────
-const COLOR = {
-  primary:   "#1a3c6e",
-  secondary: "#2a5298",
-  white:     "#ffffff",
-  green:     "#22c55e",
-  blue:      "#3b82f6",
-  purple:    "#8b5cf6",
-  grayLight: "#f1f5f9",
-};
+// ─── Hook de tema ─────────────────────────────────────────────────────────────
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-const styles = {
-  nav: {
-    backgroundColor: COLOR.primary,
-    color:           COLOR.white,
-    padding:         "0 2rem",
-    height:          "64px",
-    display:         "flex",
-    alignItems:      "center",
-    justifyContent:  "space-between",
-    boxShadow:       "0 2px 8px rgba(0,0,0,0.25)",
-    position:        "sticky",
-    top:             0,
-    zIndex:          100,
-  },
-  brand: {
-    fontSize:   "1.2rem",
-    fontWeight: 700,
-    letterSpacing: "0.02em",
-    color:      COLOR.white,
-    margin:     0,
-    display:    "flex",
-    alignItems: "center",
-    gap:        "0.5rem",
-  },
-  brandIcon: {
-    fontSize: "1.4rem",
-  },
-  right: {
-    display:    "flex",
-    alignItems: "center",
-    gap:        "0.75rem",
-  },
-  badge: (color) => ({
-    backgroundColor: color,
-    color:           COLOR.white,
-    fontSize:        "0.7rem",
-    fontWeight:      600,
-    padding:         "0.2rem 0.55rem",
-    borderRadius:    "999px",
-    letterSpacing:   "0.04em",
-    textTransform:   "uppercase",
-  }),
-  address: {
-    fontSize:        "0.85rem",
-    color:           "#cbd5e1",
-    fontFamily:      "monospace",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    padding:         "0.25rem 0.65rem",
-    borderRadius:    "6px",
-  },
-  btnConnect: {
-    backgroundColor: COLOR.white,
-    color:           COLOR.primary,
-    border:          "none",
-    padding:         "0.45rem 1.1rem",
-    borderRadius:    "6px",
-    fontWeight:      700,
-    fontSize:        "0.85rem",
-    cursor:          "pointer",
-    transition:      "opacity 0.15s",
-  },
-  btnDisconnect: {
-    backgroundColor: "transparent",
-    color:           "#94a3b8",
-    border:          "1px solid #475569",
-    padding:         "0.35rem 0.8rem",
-    borderRadius:    "6px",
-    fontSize:        "0.78rem",
-    cursor:          "pointer",
-    transition:      "border-color 0.15s, color 0.15s",
-  },
-};
+function useTheme() {
+  const [isDark, setIsDark] = useState(() => {
+    try {
+      return localStorage.getItem("certchain-theme") === "dark";
+    } catch {
+      return false;
+    }
+  });
 
-// ─── Helpers de presentación ─────────────────────────────────────────────────
+  useEffect(() => {
+    const el = document.documentElement;
+    if (isDark) {
+      el.setAttribute("data-theme", "dark");
+      localStorage.setItem("certchain-theme", "dark");
+    } else {
+      el.removeAttribute("data-theme");
+      localStorage.setItem("certchain-theme", "light");
+    }
+  }, [isDark]);
 
-/** Abrevia una dirección Ethereum: 0x1234...abcd */
+  return [isDark, setIsDark];
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+/** Muestra los últimos 6 caracteres de la dirección con prefijo ··· */
 function abreviarDireccion(address) {
   if (!address) return "";
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  return `···${address.slice(-6)}`;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -106,65 +47,67 @@ export default function Navbar() {
     desconectarWallet,
   } = useWeb3();
 
+  const [isDark, setIsDark] = useTheme();
+
   return (
-    <nav style={styles.nav}>
+    <nav className="navbar">
       {/* Marca */}
-      <h1 style={styles.brand}>
-        <span style={styles.brandIcon}>🎓</span>
-        CertChain — Certificación Académica
-      </h1>
+      <div className="navbar-brand">
+        <span className="navbar-brand-name">CertChain</span>
+        <span className="navbar-brand-sub">Certificación Académica</span>
+      </div>
 
       {/* Zona derecha */}
-      <div style={styles.right}>
+      <div className="navbar-right">
         {isConnected ? (
           <>
-            {/* Dirección abreviada */}
-            <span style={styles.address} title={account}>
+            {/* Wallet */}
+            <span className="navbar-address" title={account}>
               {abreviarDireccion(account)}
             </span>
 
-            {/* Badge: siempre aparece si está conectado */}
-            <span style={styles.badge(COLOR.green)}>Conectado</span>
-
-            {/* Badge: rol Emisor */}
+            {/* Roles */}
             {isEmisor && (
-              <span style={styles.badge(COLOR.blue)}>Emisor</span>
+              <span className="navbar-badge navbar-badge--emisor">Emisor</span>
             )}
-
-            {/* Badge: rol Owner (se muestra junto al de Emisor si aplica) */}
             {isOwner && (
-              <span style={styles.badge(COLOR.purple)}>Owner</span>
+              <span className="navbar-badge navbar-badge--owner">Owner</span>
             )}
 
-            {/* Botón desconectar */}
+            <span className="navbar-sep" aria-hidden="true" />
+
+            {/* Toggle tema */}
             <button
-              style={styles.btnDisconnect}
-              onClick={desconectarWallet}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = "#94a3b8";
-                e.target.style.color       = "#ffffff";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = "#475569";
-                e.target.style.color       = "#94a3b8";
-              }}
+              className="navbar-btn"
+              onClick={() => setIsDark((d) => !d)}
+              title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             >
+              {isDark ? "Modo Claro" : "Modo Oscuro"}
+            </button>
+
+            {/* Desconectar */}
+            <button className="navbar-btn" onClick={desconectarWallet}>
               Desconectar
             </button>
           </>
         ) : (
-          /* Botón conectar */
-          <button
-            style={{
-              ...styles.btnConnect,
-              opacity: loading ? 0.65 : 1,
-              cursor:  loading ? "not-allowed" : "pointer",
-            }}
-            onClick={conectarWallet}
-            disabled={loading}
-          >
-            {loading ? "Conectando…" : "Conectar MetaMask"}
-          </button>
+          <>
+            {/* Toggle tema (incluso sin conectar) */}
+            <button
+              className="navbar-btn"
+              onClick={() => setIsDark((d) => !d)}
+            >
+              {isDark ? "Modo Claro" : "Modo Oscuro"}
+            </button>
+
+            <button
+              className="navbar-btn-connect"
+              onClick={conectarWallet}
+              disabled={loading}
+            >
+              {loading ? "Conectando…" : "Conectar MetaMask"}
+            </button>
+          </>
         )}
       </div>
     </nav>

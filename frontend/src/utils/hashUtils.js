@@ -47,3 +47,17 @@ export function formatHashDisplay(hash) {
   if (!hash || hash.length < 20) return hash ?? "";
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
 }
+
+/**
+ * Calcula el hash SHA-256 de un ArrayBuffer.
+ * Útil para hashear el contenido binario de un archivo ya leído.
+ *
+ * @param {ArrayBuffer} arrayBuffer
+ * @returns {Promise<string>} Hash SHA-256 en formato "0x<64 chars hex>"
+ */
+export async function calcularHashDeArrayBuffer(arrayBuffer) {
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", arrayBuffer);
+  const hashArray  = Array.from(new Uint8Array(hashBuffer));
+  const hashHex    = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return "0x" + hashHex;
+}

@@ -28,18 +28,14 @@ const esHashValido = (h) => /^0x[0-9a-fA-F]{64}$/.test(h);
 
 // ─── Sub-componente: preview del certificado ──────────────────────────────────
 
-function PreviewCertificado({ cert, account, onFirmar, procesando }) {
+function PreviewCertificado({ cert, account, carrera, setCarrera, errorCarrera, onFirmar, procesando }) {
   const mismaWallet =
     cert.estudianteWallet?.toLowerCase() === account?.toLowerCase();
 
   return (
     <div
-      className="cert-card"
-      style={{
-        borderColor: cert.revocado ? "#fca5a5" : "#93c5fd",
-        background:  cert.revocado ? "#fef2f2"  : "#eff6ff",
-        marginTop:   "1.25rem",
-      }}
+      className={`cert-card ${cert.revocado ? "cert-revocado" : ""}`}
+      style={{ marginTop: "1.25rem" }}
     >
       {/* Encabezado */}
       <div className="cert-header">
@@ -76,7 +72,7 @@ function PreviewCertificado({ cert, account, onFirmar, procesando }) {
         {cert.firmadoPorEstudiante && (
           <div className="alert alert-success" style={{ marginInline: 0 }}>
             <div>
-              <strong>✍️ Certificado ya firmado</strong>
+              <strong>Certificado ya firmado</strong>
               <p style={{ marginTop: "0.3rem", fontSize: "0.85rem" }}>
                 Firmado el {formatFecha(cert.fechaFirmaEstudiante)}
               </p>
@@ -88,9 +84,32 @@ function PreviewCertificado({ cert, account, onFirmar, procesando }) {
         {!cert.firmadoPorEstudiante && !cert.revocado && mismaWallet && (
           <div>
             <div className="alert alert-warning" style={{ marginInline: 0, marginBottom: "0.75rem" }}>
-              <span>⏳</span>
-              <span>Este certificado está pendiente de tu firma de recepción.</span>
+              Este certificado está pendiente de tu firma de recepción.
             </div>
+
+            {/* Campo carrera — requerido para firmar */}
+            <div className="form-group" style={{ marginBottom: "0.75rem" }}>
+              <label htmlFor="carrera-firmar">
+                Carrera / Programa académico
+                <span style={{ color: "var(--color-error)", marginLeft: "0.2rem" }}>*</span>
+              </label>
+              <input
+                id="carrera-firmar"
+                type="text"
+                placeholder="Ej: Ingeniería de Sistemas Informáticos"
+                value={carrera}
+                onChange={(e) => setCarrera(e.target.value)}
+              />
+              {errorCarrera && (
+                <span className="form-hint" style={{ color: "var(--danger)" }}>
+                  {errorCarrera}
+                </span>
+              )}
+              <span className="form-hint">
+                Ingresa la carrera tal como aparece en el certificado para que figure en el PDF.
+              </span>
+            </div>
+
             <button
               className="btn-primary"
               onClick={onFirmar}
@@ -103,7 +122,7 @@ function PreviewCertificado({ cert, account, onFirmar, procesando }) {
                   Procesando firma…
                 </span>
               ) : (
-                "✍️ Firmar Recepción"
+                "Firmar Recepción"
               )}
             </button>
           </div>
@@ -112,7 +131,6 @@ function PreviewCertificado({ cert, account, onFirmar, procesando }) {
         {/* No firmado — wallet incorrecta */}
         {!cert.firmadoPorEstudiante && !cert.revocado && !mismaWallet && (
           <div className="alert alert-error" style={{ marginInline: 0 }}>
-            <span>🚫</span>
             <div>
               <strong>Esta wallet no es la destinataria del certificado.</strong>
               <p style={{ marginTop: "0.3rem", fontSize: "0.82rem" }}>
@@ -129,7 +147,6 @@ function PreviewCertificado({ cert, account, onFirmar, procesando }) {
         {/* Revocado */}
         {cert.revocado && (
           <div className="alert alert-error" style={{ marginInline: 0 }}>
-            <span>❌</span>
             <div>
               <strong>Certificado revocado — no se puede firmar.</strong>
               <p style={{ marginTop: "0.3rem", fontSize: "0.82rem" }}>
@@ -158,6 +175,9 @@ export default function FirmarRecepcion() {
   const [buscando,      setBuscando]      = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
 
+  const [carrera,       setCarrera]       = useState("");
+  const [errorCarrera,  setErrorCarrera]  = useState("");
+
   const [procesando,    setProcesando]    = useState(false);
   const [txHash,        setTxHash]        = useState("");
   const [txError,       setTxError]       = useState("");
@@ -171,6 +191,8 @@ export default function FirmarRecepcion() {
     setErrorBusqueda("");
     setTxHash("");
     setTxError("");
+    setCarrera("");
+    setErrorCarrera("");
 
     if (!esHashValido(hashDocumento)) return;
 
@@ -213,6 +235,11 @@ export default function FirmarRecepcion() {
   };
 
   const handleFirmar = async () => {
+    if (!carrera.trim()) {
+      setErrorCarrera("La carrera es requerida para generar el PDF del certificado.");
+      return;
+    }
+    setErrorCarrera("");
     setTxError("");
     setProcesando(true);
 
@@ -222,7 +249,6 @@ export default function FirmarRecepcion() {
       setTxError(error);
     } else {
       setTxHash(data.hash);
-      // Actualizar el preview localmente sin refetch
       setCertData((prev) => ({
         ...prev,
         firmadoPorEstudiante: true,
@@ -237,7 +263,8 @@ export default function FirmarRecepcion() {
     await descargarCertificado({
       nombreEstudiante:     certData.nombreEstudiante,
       codigoCertificado:    certData.codigoCertificado,
-      carrera:              "—",
+      carrera:              carrera.trim(),
+      universidad:          "Universidad Boliviana",
       fechaEmision:         formatFecha(certData.fechaEmision),
       hashDocumento:        hashDocumento,
       emisorWallet:         certData.emisor,
@@ -252,7 +279,7 @@ export default function FirmarRecepcion() {
 
   return (
     <div className="form-card">
-      <h3>✍️ Firmar Recepción de Certificado</h3>
+      <h3>Firmar Recepción de Certificado</h3>
       <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "1.25rem" }}>
         Como estudiante, puedes firmar digitalmente la recepción de tu certificado
         para confirmar que lo has recibido.
@@ -261,8 +288,8 @@ export default function FirmarRecepcion() {
       {/* ── Selector de modo ── */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem" }}>
         {[
-          { id: "pdf",  label: "📄 Buscar por PDF"  },
-          { id: "hash", label: "🔑 Buscar por Hash" },
+          { id: "pdf",  label: "Buscar por PDF"  },
+          { id: "hash", label: "Buscar por Hash" },
         ].map(({ id, label }) => (
           <label
             key={id}
@@ -271,7 +298,7 @@ export default function FirmarRecepcion() {
               cursor:       "pointer", padding: "0.4rem 0.9rem",
               borderRadius: "var(--radius)",
               border:       `1.5px solid ${modo === id ? "var(--primary)" : "var(--border)"}`,
-              background:    modo === id ? "#eff6ff" : "var(--bg)",
+              background:    modo === id ? "var(--color-active-bg)" : "var(--bg)",
               color:         modo === id ? "var(--primary)" : "var(--text-muted)",
               fontWeight:    modo === id ? 700 : 400,
               fontSize:      "0.88rem",
@@ -350,15 +377,18 @@ export default function FirmarRecepcion() {
       {/* ── Error de búsqueda ── */}
       {errorBusqueda && (
         <div className="alert alert-error" style={{ marginInline: 0, marginTop: "0.75rem" }}>
-          <span>⚠️</span> {errorBusqueda}
+          {errorBusqueda}
         </div>
       )}
 
-      {/* ── Preview + acciones ── */}
+      {/* ── Preview + campo carrera + botón firmar ── */}
       {certData && (
         <PreviewCertificado
           cert={certData}
           account={account}
+          carrera={carrera}
+          setCarrera={setCarrera}
+          errorCarrera={errorCarrera}
           onFirmar={handleFirmar}
           procesando={procesando}
         />
@@ -367,7 +397,7 @@ export default function FirmarRecepcion() {
       {/* ── Error al firmar ── */}
       {txError && (
         <div className="alert alert-error" style={{ marginInline: 0, marginTop: "1rem" }}>
-          <span>⚠️</span> {txError}
+          {txError}
         </div>
       )}
 
@@ -376,7 +406,7 @@ export default function FirmarRecepcion() {
         <>
           <div className="alert alert-success" style={{ marginInline: 0, marginTop: "1rem" }}>
             <div style={{ width: "100%" }}>
-              <strong>✅ Firma registrada en blockchain</strong>
+              <strong>Firma registrada en blockchain</strong>
               <p style={{ marginTop: "0.4rem", fontSize: "0.85rem" }}>
                 Hash de transacción:{" "}
                 <code style={{ background: "rgba(0,0,0,0.06)", padding: "0.1rem 0.3rem", borderRadius: 4 }}>
@@ -400,7 +430,6 @@ export default function FirmarRecepcion() {
             </div>
           </div>
 
-          {/* ── Botón descargar PDF con ambas firmas ── */}
           <div style={{
             marginTop:    "1rem",
             padding:      "0.9rem 1rem",
@@ -414,7 +443,7 @@ export default function FirmarRecepcion() {
               onClick={handleDescargarPDF}
               style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
             >
-              ⬇ Descargar PDF con ambas firmas
+              Descargar PDF con ambas firmas
             </button>
           </div>
         </>

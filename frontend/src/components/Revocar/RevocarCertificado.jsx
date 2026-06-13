@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useContract }                        from "../../hooks/useContract";
-import { useWeb3 }                            from "../../context/Web3Context";
-import { calcularHashPDF, formatHashDisplay } from "../../utils/hashUtils";
+import { useContract }                                   from "../../hooks/useContract";
+import { useWeb3 }                                       from "../../context/Web3Context";
+import { calcularHashPDF, formatHashDisplay }            from "../../utils/hashUtils";
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
@@ -30,16 +30,12 @@ function PreviewCertificado({ cert }) {
   const esRevocado = cert.revocado;
   return (
     <div
-      className="cert-card"
-      style={{
-        borderColor: esRevocado ? "var(--danger)" : "var(--accent)",
-        background:  esRevocado ? "#fef2f2"       : "#eff6ff",
-        marginTop:   "1rem",
-      }}
+      className={`cert-card ${esRevocado ? "cert-revocado" : ""}`}
+      style={{ marginTop: "1rem" }}
     >
       <div className="cert-header">
         <span className="cert-title">
-          {esRevocado ? "❌ Certificado ya revocado" : "📋 Certificado encontrado"}
+          {esRevocado ? "Certificado revocado" : "Certificado encontrado"}
         </span>
         <span className={`badge ${esRevocado ? "badge-danger" : "badge-info"}`}>
           {esRevocado ? "Revocado" : "Activo"}
@@ -75,56 +71,36 @@ function PreviewCertificado({ cert }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function RevocarCertificado() {
-  const { chainId }                              = useWeb3();
-  const { verificarCertificado, revocarCertificado } = useContract();
+  const { chainId }                                   = useWeb3();
+  const { verificarCertificado, revocarCertificado }  = useContract();
 
-  // Modo de entrada del hash
-  const [modoInput,      setModoInput]      = useState("pdf");
+  // ── Modo ───────────────────────────────────────────────────────────────────
+  const [modo, setModo] = useState("pdf"); // "pdf" | "hash"
 
-  // Campos de entrada
+  // ── Modo PDF ───────────────────────────────────────────────────────────────
   const [hashCalculado,  setHashCalculado]  = useState("");
   const [calculandoHash, setCalculandoHash] = useState(false);
-  const [hashManual,     setHashManual]     = useState("");
 
-  // Hash definitivo a usar
-  const hashDocumento = modoInput === "pdf" ? hashCalculado : hashManual.trim();
+  // ── Modo Hash ──────────────────────────────────────────────────────────────
+  const [hashManual, setHashManual] = useState("");
 
-  // Búsqueda del certificado
+  // Hash activo según modo
+  const hashDocumento = modo === "pdf" ? hashCalculado : hashManual.trim();
+
+  // ── Estado de búsqueda ─────────────────────────────────────────────────────
   const [certPreview,   setCertPreview]   = useState(null);
   const [buscando,      setBuscando]      = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
 
-  // Formulario de revocación
-  const [motivo,     setMotivo]     = useState("");
+  // ── Estado de revocación ───────────────────────────────────────────────────
+  const [motivo,      setMotivo]      = useState("");
   const [errorMotivo, setErrorMotivo] = useState("");
-
-  // Flujo de confirmación de dos pasos
   const [confirmando, setConfirmando] = useState(false);
   const [procesando,  setProcesando]  = useState(false);
+  const [txHash,      setTxHash]      = useState("");
+  const [txError,     setTxError]     = useState("");
 
-  // Resultado
-  const [txHash,  setTxHash]  = useState("");
-  const [txError, setTxError] = useState("");
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
-
-  const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) { setHashCalculado(""); return; }
-
-    setHashCalculado("");
-    resetBusqueda();
-    setCalculandoHash(true);
-
-    try {
-      const hash = await calcularHashPDF(file);
-      setHashCalculado(hash);
-    } catch {
-      setErrorBusqueda("No se pudo leer el archivo PDF.");
-    } finally {
-      setCalculandoHash(false);
-    }
-  };
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const resetBusqueda = () => {
     setCertPreview(null);
@@ -136,21 +112,48 @@ export default function RevocarCertificado() {
     setTxError("");
   };
 
+  const cambiarModo = (m) => {
+    setModo(m);
+    setHashCalculado("");
+    setHashManual("");
+    resetBusqueda();
+  };
+
+  // ── Manejo del archivo PDF ─────────────────────────────────────────────────
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    setHashCalculado("");
+    resetBusqueda();
+
+    if (!file) return;
+
+    setCalculandoHash(true);
+    try {
+      const hash = await calcularHashPDF(file);
+      setHashCalculado(hash);
+    } catch {
+      setErrorBusqueda("No se pudo calcular el hash del archivo PDF.");
+    } finally {
+      setCalculandoHash(false);
+    }
+  };
+
+  // ── Buscar certificado ─────────────────────────────────────────────────────
+
   const handleBuscar = async () => {
     if (!hashDocumento) {
       setErrorBusqueda(
-        modoInput === "pdf"
-          ? "Selecciona primero un archivo PDF."
+        modo === "pdf"
+          ? "Selecciona un archivo PDF primero."
           : "Ingresa el hash del certificado."
       );
       return;
     }
-
     resetBusqueda();
     setBuscando(true);
 
     const { data, error } = await verificarCertificado(hashDocumento);
-
     if (error) {
       setErrorBusqueda(error);
     } else if (!data.exists) {
@@ -161,8 +164,9 @@ export default function RevocarCertificado() {
     setBuscando(false);
   };
 
+  // ── Revocar ────────────────────────────────────────────────────────────────
+
   const handleRevocarClick = () => {
-    // Validar motivo antes de entrar al flujo de confirmación
     if (motivo.trim().length < MOTIVO_MIN) {
       setErrorMotivo(`El motivo debe tener al menos ${MOTIVO_MIN} caracteres.`);
       return;
@@ -177,53 +181,54 @@ export default function RevocarCertificado() {
     setProcesando(true);
 
     const { data, error } = await revocarCertificado(hashDocumento, motivo.trim());
-
     if (error) {
       setTxError(error);
     } else {
       setTxHash(data.hash);
-      // Marcar el preview como revocado localmente
       setCertPreview((prev) => ({ ...prev, revocado: true, motivoRevocacion: motivo.trim() }));
       setMotivo("");
     }
     setProcesando(false);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Derivados ──────────────────────────────────────────────────────────────
 
-  const urlEtherscan = txHash ? etherscanTx(chainId, txHash) : null;
+  const urlEtherscan   = txHash ? etherscanTx(chainId, txHash) : null;
   const certYaRevocado = certPreview?.revocado;
   const puedeRevocar   = certPreview && !certYaRevocado && !txHash;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="form-card">
-      <h3>🚫 Revocar Certificado</h3>
+      <h3>Revocar Certificado</h3>
 
-      {/* ── Selector de modo de entrada ── */}
+      {/* ── Selector de modo ── */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem" }}>
         {[
-          { id: "pdf",  label: "📄 Por PDF"  },
-          { id: "hash", label: "🔑 Por Hash" },
+          { id: "pdf",  label: "Buscar por PDF"  },
+          { id: "hash", label: "Buscar por Hash" },
         ].map(({ id, label }) => (
           <label
             key={id}
             style={{
-              display:    "flex", alignItems: "center", gap: "0.35rem",
-              cursor:     "pointer", padding: "0.4rem 0.85rem",
+              display:      "flex", alignItems: "center", gap: "0.35rem",
+              cursor:       "pointer", padding: "0.45rem 0.9rem",
               borderRadius: "var(--radius)",
-              border:     `1.5px solid ${modoInput === id ? "var(--primary)" : "var(--border)"}`,
-              background:  modoInput === id ? "#eff6ff" : "var(--bg)",
-              color:       modoInput === id ? "var(--primary)" : "var(--text-muted)",
-              fontWeight:  modoInput === id ? 700 : 400,
-              fontSize:    "0.88rem",
+              border:       `1.5px solid ${modo === id ? "var(--primary)" : "var(--border)"}`,
+              background:    modo === id ? "var(--color-active-bg)" : "var(--bg)",
+              color:         modo === id ? "var(--primary)" : "var(--text-muted)",
+              fontWeight:    modo === id ? 700 : 400,
+              fontSize:      "0.88rem",
+              transition:    "all 0.15s",
             }}
           >
             <input
               type="radio"
               name="modo-revocar"
               value={id}
-              checked={modoInput === id}
-              onChange={() => { setModoInput(id); resetBusqueda(); setHashCalculado(""); setHashManual(""); }}
+              checked={modo === id}
+              onChange={() => cambiarModo(id)}
               style={{ display: "none" }}
             />
             {label}
@@ -231,8 +236,8 @@ export default function RevocarCertificado() {
         ))}
       </div>
 
-      {/* ── Entrada: PDF ── */}
-      {modoInput === "pdf" && (
+      {/* ── Entrada PDF ── */}
+      {modo === "pdf" && (
         <div className="form-group">
           <label htmlFor="pdf-revocar">Archivo PDF del certificado</label>
           <input
@@ -243,19 +248,22 @@ export default function RevocarCertificado() {
           />
           {calculandoHash && (
             <div className="loading-row" style={{ justifyContent: "flex-start", paddingLeft: 0 }}>
-              <span className="spinner" /> Calculando hash…
+              <span className="spinner" /> Calculando hash SHA-256…
             </div>
           )}
           {hashCalculado && (
             <span className="form-hint">
-              Hash: <strong style={{ fontFamily: "monospace" }}>{formatHashDisplay(hashCalculado)}</strong>
+              Hash calculado:{" "}
+              <strong style={{ fontFamily: "monospace" }}>
+                {formatHashDisplay(hashCalculado)}
+              </strong>
             </span>
           )}
         </div>
       )}
 
-      {/* ── Entrada: hash manual ── */}
-      {modoInput === "hash" && (
+      {/* ── Entrada hash manual ── */}
+      {modo === "hash" && (
         <div className="form-group">
           <label htmlFor="hash-revocar">Hash SHA-256 del certificado (bytes32)</label>
           <input
@@ -266,6 +274,9 @@ export default function RevocarCertificado() {
             onChange={(e) => { setHashManual(e.target.value); resetBusqueda(); }}
             style={{ fontFamily: "monospace", fontSize: "0.85rem" }}
           />
+          <span className="form-hint">
+            Hash de 66 caracteres que empieza con 0x.
+          </span>
         </div>
       )}
 
@@ -278,30 +289,28 @@ export default function RevocarCertificado() {
       >
         {buscando ? (
           <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span className="spinner" /> Buscando certificado…
+            <span className="spinner" /> Buscando…
           </span>
         ) : (
-          "Buscar certificado"
+          "Buscar Certificado"
         )}
       </button>
 
-      {/* ── Error de búsqueda ── */}
       {errorBusqueda && (
         <div className="alert alert-error" style={{ marginInline: 0 }}>
-          <span>⚠️</span> {errorBusqueda}
+          {errorBusqueda}
         </div>
       )}
 
-      {/* ── Preview del certificado ── */}
       {certPreview && <PreviewCertificado cert={certPreview} />}
 
-      {/* ── Formulario de revocación (solo si el cert existe y no está revocado) ── */}
+      {/* ── Formulario de revocación ── */}
       {puedeRevocar && (
-        <div style={{ marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}>
+        <div style={{ marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid var(--color-border)" }}>
           <div className="form-group">
             <label htmlFor="motivo">
-              Motivo de revocación{" "}
-              <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+              Motivo de revocación
+              <span style={{ color: "var(--color-text-muted)", fontWeight: 400, marginLeft: "0.3rem" }}>
                 (mín. {MOTIVO_MIN} caracteres)
               </span>
             </label>
@@ -312,17 +321,20 @@ export default function RevocarCertificado() {
               onChange={(e) => { setMotivo(e.target.value); setErrorMotivo(""); setConfirmando(false); }}
               rows={3}
             />
-            <span className="form-hint" style={{ color: motivo.trim().length < MOTIVO_MIN && motivo ? "var(--danger)" : "var(--text-muted)" }}>
+            <span className="form-hint" style={{
+              color: motivo.trim().length < MOTIVO_MIN && motivo
+                ? "var(--color-error)"
+                : "var(--color-text-muted)"
+            }}>
               {motivo.trim().length}/{MOTIVO_MIN}+ caracteres
             </span>
             {errorMotivo && (
-              <span className="form-hint" style={{ color: "var(--danger)" }}>
+              <span className="form-hint" style={{ color: "var(--color-error)" }}>
                 {errorMotivo}
               </span>
             )}
           </div>
 
-          {/* ── Botones de revocación con confirmación en dos pasos ── */}
           {!confirmando ? (
             <button
               className="btn-danger"
@@ -346,7 +358,7 @@ export default function RevocarCertificado() {
                     Procesando transacción…
                   </span>
                 ) : (
-                  "⚠️ Confirmar Revocación"
+                  "Confirmar Revocación"
                 )}
               </button>
               <button
@@ -361,11 +373,10 @@ export default function RevocarCertificado() {
         </div>
       )}
 
-      {/* ── Resultado: éxito ── */}
       {txHash && (
         <div className="alert alert-success" style={{ marginTop: "1.25rem", marginInline: 0 }}>
           <div style={{ width: "100%" }}>
-            <strong>✅ Certificado revocado exitosamente</strong>
+            <strong>Certificado revocado correctamente</strong>
             <p style={{ marginTop: "0.4rem", fontSize: "0.85rem" }}>
               Hash de la transacción:{" "}
               <code style={{ background: "rgba(0,0,0,0.06)", padding: "0.1rem 0.3rem", borderRadius: 4 }}>
@@ -376,12 +387,12 @@ export default function RevocarCertificado() {
                   href={urlEtherscan}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ marginLeft: "0.6rem", color: "var(--primary)", fontWeight: 600 }}
+                  style={{ marginLeft: "0.6rem", color: "var(--color-primary)", fontWeight: 600 }}
                 >
-                  Ver en Etherscan →
+                  Ver en Etherscan
                 </a>
               ) : (
-                <span style={{ marginLeft: "0.6rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                <span style={{ marginLeft: "0.6rem", color: "var(--color-text-muted)", fontSize: "0.8rem" }}>
                   (red local — Etherscan no disponible)
                 </span>
               )}
@@ -390,10 +401,9 @@ export default function RevocarCertificado() {
         </div>
       )}
 
-      {/* ── Resultado: error ── */}
       {txError && (
         <div className="alert alert-error" style={{ marginTop: "1.25rem", marginInline: 0 }}>
-          <span>⚠️</span> {txError}
+          {txError}
         </div>
       )}
     </div>
