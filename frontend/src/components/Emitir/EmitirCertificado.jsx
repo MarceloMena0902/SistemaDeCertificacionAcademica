@@ -121,9 +121,9 @@ export default function EmitirCertificado() {
     }
   };
 
-  const handleDescargarPDF = () => {
+  const handleDescargarPDF = async () => {
     if (!certEmitido) return;
-    descargarCertificado(certEmitido);
+    await descargarCertificado(certEmitido);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@
  */
 
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 
 // ─── Constantes de layout ────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ const CLR = {
   grayBg:      [245, 245, 245],   // #f5f5f5
   borderLine:  [218, 218, 218],
   accent:      [201, 162,  39],   // dorado decorativo
+  logoGold:    [212, 175,  55],   // #D4AF37 - dorado del logo
   green:       [22,  163,  74],   // firma confirmada
   warning:     [180, 120,   0],   // firma pendiente
 };
@@ -79,9 +81,9 @@ function _draw(doc, rgb) {
  * @param {string} [datos.emisorTxHash]      - hash de tx de emisión (preferido)
  * @param {string} [datos.estudianteTxHash]  - hash de tx de firma del estudiante (opcional)
  * @param {string} [datos.fechaFirmaEstudiante] - fecha legible de firma del estudiante (opcional)
- * @returns {jsPDF}
+ * @returns {Promise<jsPDF>}
  */
-export function generarCertificadoPDF(datos) {
+export async function generarCertificadoPDF(datos) {
   const {
     nombreEstudiante,
     codigoCertificado,
@@ -115,7 +117,35 @@ export function generarCertificadoPDF(datos) {
   _fill(doc, CLR.accent);
   doc.rect(0, headerH - 1.5, A4_W, 1.5, "F");
 
-  // Título principal
+  // ── LOGO FICTICIO DE UNIVERSIDAD ──────────────────────────────────────────
+  // Bounding box del logo: top-left en (20, 8), radio exterior 12mm
+  const logoX = 32; // centro X = 20 + 12 (radio)
+  const logoY = 20; // centro Y = 8 + 12 (radio)
+
+  // Círculo exterior dorado (#D4AF37)
+  _fill(doc, CLR.logoGold);
+  _draw(doc, CLR.logoGold);
+  doc.setLineWidth(0);
+  doc.circle(logoX, logoY, 12, "F");
+
+  // Círculo interior azul oscuro (#1a3c6e)
+  _fill(doc, CLR.primary);
+  _draw(doc, CLR.primary);
+  doc.circle(logoX, logoY, 9, "F");
+
+  // Texto "UB" en blanco bold 10pt centrado
+  _text(doc, CLR.white);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("UB", logoX, logoY + 1.5, { align: "center" });
+
+  // Texto "Est. 1832" en dorado 5pt debajo del círculo
+  _text(doc, CLR.logoGold);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5);
+  doc.text("Est. 1832", logoX, logoY + 15.5, { align: "center" });
+
+  // Título principal — centrado en la página respetando el logo
   _text(doc, CLR.white);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
@@ -193,8 +223,13 @@ export function generarCertificadoPDF(datos) {
 
   _text(doc, CLR.primary);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.text(carrera, CENTER, 110, { align: "center" });
+
+  // Reducir fuente si el texto es largo para que no se corte
+  doc.setFontSize(16);
+  const carreraWidth = doc.getTextWidth(carrera || "");
+  const maxCarreraWidth = A4_W - 2 * MARGIN - 20;
+  doc.setFontSize(carreraWidth > maxCarreraWidth ? 13 : 16);
+  doc.text(carrera || "—", CENTER, 110, { align: "center" });
 
   // ── 7. SEPARADOR INFERIOR ANTES DE LA TABLA ───────────────────────────────
 
@@ -211,10 +246,10 @@ export function generarCertificadoPDF(datos) {
   let   rowY        = 132;   // Y de la primera fila
 
   const filas = [
-    ["Código del Certificado:", codigoCertificado || "—"],
-    ["Fecha de Emisión:",       fechaEmision || "—"],
-    ["Institución:",            universidad],
-    ["Dirección del Emisor:",   _abrevDir(emisorWallet)],
+    ["Institución:",              universidad],
+    ["Código del Certificado:",   codigoCertificado || "—"],
+    ["Fecha de Emisión:",         fechaEmision || "—"],
+    ["Lugar de Emisión:",         "Cochabamba - Bolivia"],
   ];
 
   doc.setFontSize(9);
@@ -233,12 +268,47 @@ export function generarCertificadoPDF(datos) {
     rowY += rowStep;
   });
 
-  // ── 9. REGISTRO DE FIRMAS DIGITALES ──────────────────────────────────────
+  // ── 9. QR DE VERIFICACIÓN + RESUMEN DE FIRMAS ─────────────────────────────
 
-  const sigY  = 178;
-  const sigW  = A4_W - 2 * (MARGIN + 2);
-  const sigX  = MARGIN + 2;
-  const sigH  = estudianteTxHash ? 72 : 68;
+  // Construir texto para el QR
+  let qrText =
+    `CERTCHAIN - VERIFICACION DE FIRMAS\n` +
+    `Certificado: ${codigoCertificado}\n\n` +
+    `Estudiante: ${nombreEstudiante}\n\n` +
+    `Institucion: Universidad Boliviana\n\n` +
+    `Fecha Emision: ${fechaEmision}\n` +
+    `FIRMA DE EMISION\n\n` +
+    `Emisor: ${emisorWallet}\n\n` +
+    `TX: ${_emisorTxHash || "—"}\n\n` +
+    `Estado: VALIDA\n` +
+    `FIRMA DE RECEPCION\n\n`;
+
+  if (estudianteTxHash) {
+    qrText +=
+      `TX: ${estudianteTxHash}\n\n` +
+      `Fecha: ${fechaFirmaEstudiante || "—"}\n\n` +
+      `Estado: VALIDA\n`;
+  } else {
+    qrText += `Estado: PENDIENTE - El estudiante aun no ha firmado\n`;
+  }
+
+  qrText +=
+    `Hash SHA-256 del documento:\n\n` +
+    `${hashDocumento}\n` +
+    `Verificado en Blockchain Ethereum (Hardhat Local / Sepolia)`;
+
+  // Generar QR como Data URL (PNG base64)
+  const qrDataUrl = await QRCode.toDataURL(qrText, {
+    width:  200,
+    margin: 1,
+    color:  { dark: "#1a3c6e", light: "#FFFFFF" },
+  });
+
+  // Recuadro de firmas
+  const sigY = 178;
+  const sigH = 68;
+  const sigX = MARGIN + 2;
+  const sigW = A4_W - 2 * (MARGIN + 2);
 
   // Fondo del recuadro
   _fill(doc, CLR.grayBg);
@@ -252,81 +322,73 @@ export function generarCertificadoPDF(datos) {
   _text(doc, CLR.primaryDark);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.text("REGISTRO DE FIRMAS DIGITALES", sigX + 7, sigY + 7);
+  doc.text("REGISTRO DE FIRMAS", sigX + 7, sigY + 7);
 
   // Separador
   _draw(doc, CLR.borderLine);
   doc.setLineWidth(0.2);
   doc.line(sigX + 4, sigY + 10, sigX + sigW - 4, sigY + 10);
 
-  // ── 9a. Firma de Emisión ────────────────────────────────────────────────
-
-  const e1Y = sigY + 17;
+  // ── Firma del Emisor (resumen) ─────────────────────────────────────────
+  const textX = sigX + 7;
+  let   textY = sigY + 18;
 
   _text(doc, CLR.green);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text("✓ Firma de Emisión", sigX + 7, e1Y);
-
-  const dataLabelX = sigX + 12;
-  const dataValueX = sigX + 32;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-
-  _text(doc, CLR.grayLight);
-  doc.text("Emisor:",  dataLabelX, e1Y + 6);
-  doc.text("TX:",      dataLabelX, e1Y + 11);
-  doc.text("Fecha:",   dataLabelX, e1Y + 16);
+  doc.setFontSize(7);
+  doc.text("✓ Emisor:", textX, textY);
 
   _text(doc, CLR.black);
   doc.setFont("courier", "normal");
-  doc.setFontSize(7);
-  doc.text(_abrevDir(emisorWallet),          dataValueX, e1Y + 6);
-  doc.text(_emisorTxHash ? _abrevHash(_emisorTxHash) : "—", dataValueX, e1Y + 11);
-  doc.setFont("helvetica", "normal");
-  doc.text(fechaEmision || "—",              dataValueX, e1Y + 16);
+  doc.text(_abrevDir(emisorWallet), textX + 19, textY);
 
-  // Separador entre secciones
-  _draw(doc, CLR.borderLine);
-  doc.setLineWidth(0.15);
-  doc.line(sigX + 4, sigY + 38, sigX + sigW - 4, sigY + 38);
+  textY += 8;
 
-  // ── 9b. Firma de Recepción del Estudiante ───────────────────────────────
-
-  const e2Y = sigY + 45;
-
+  // ── Firma de Recepción (resumen) ──────────────────────────────────────
   if (estudianteTxHash) {
     _text(doc, CLR.green);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("✓ Firma de Recepción del Estudiante", sigX + 7, e2Y);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-
-    _text(doc, CLR.grayLight);
-    doc.text("TX:",     dataLabelX, e2Y + 6);
-    doc.text("Fecha:",  dataLabelX, e2Y + 11);
-
-    _text(doc, CLR.black);
-    doc.setFont("courier", "normal");
     doc.setFontSize(7);
-    doc.text(_abrevHash(estudianteTxHash), dataValueX, e2Y + 6);
-    doc.setFont("helvetica", "normal");
-    doc.text(fechaFirmaEstudiante || "—",  dataValueX, e2Y + 11);
+    doc.text("✓ Recepción:", textX, textY);
+
+    _text(doc, CLR.green);
+    doc.setFont("helvetica", "bold");
+    doc.text("FIRMADA", textX + 25, textY);
   } else {
     _text(doc, CLR.warning);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("⏳ Firma de Recepción: PENDIENTE", sigX + 7, e2Y);
+    doc.setFontSize(7);
+    doc.text("⏳ Recepción:", textX, textY);
 
-    _text(doc, CLR.gray);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.text("El estudiante aún no ha firmado", sigX + 12, e2Y + 7);
-    doc.text("la recepción de este certificado.", sigX + 12, e2Y + 13);
+    _text(doc, CLR.warning);
+    doc.setFont("helvetica", "bold");
+    doc.text("PENDIENTE", textX + 25, textY);
   }
+
+  textY += 8;
+
+  _text(doc, CLR.gray);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(6);
+  doc.text("(TX hashes completos en el QR)", textX, textY);
+
+  // ── QR en esquina inferior derecha ────────────────────────────────────
+  const qrX = 155;
+  const qrY = 200;
+  const qrW = 40;
+  const qrH = 40;
+  doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrW, qrH);
+
+  // Texto debajo del QR
+  _text(doc, CLR.gray);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.text(
+    "Escanea para verificar firmas",
+    qrX + qrW / 2,
+    qrY + qrH + 4,
+    { align: "center" }
+  );
 
   // ── 10. FOOTER — fondo gris claro ─────────────────────────────────────────
 
@@ -374,9 +436,10 @@ export function generarCertificadoPDF(datos) {
  * Genera el PDF y lo descarga directamente en el navegador.
  *
  * @param {object} datos - Mismos parámetros que generarCertificadoPDF
+ * @returns {Promise<void>}
  */
-export function descargarCertificado(datos) {
-  const doc = generarCertificadoPDF(datos);
+export async function descargarCertificado(datos) {
+  const doc = await generarCertificadoPDF(datos);
   // Sanitizar el código para que sea un nombre de archivo válido
   const codigo = (datos.codigoCertificado || "certificado")
     .replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -388,9 +451,9 @@ export function descargarCertificado(datos) {
  * Útil para procesar el archivo antes de descargarlo (previsualizar, etc.).
  *
  * @param {object} datos - Mismos parámetros que generarCertificadoPDF
- * @returns {Blob}
+ * @returns {Promise<Blob>}
  */
-export function obtenerBlobCertificado(datos) {
-  const doc = generarCertificadoPDF(datos);
+export async function obtenerBlobCertificado(datos) {
+  const doc = await generarCertificadoPDF(datos);
   return doc.output("blob");
 }

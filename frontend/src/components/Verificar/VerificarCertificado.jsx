@@ -192,7 +192,7 @@ export default function VerificarCertificado() {
       }
     }
 
-    descargarCertificado({
+    await descargarCertificado({
       nombreEstudiante:     resultado.nombreEstudiante,
       codigoCertificado:    resultado.codigoCertificado,
       carrera:              "—",

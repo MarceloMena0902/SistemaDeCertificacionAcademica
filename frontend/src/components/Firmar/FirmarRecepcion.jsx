@@ -232,9 +232,9 @@ export default function FirmarRecepcion() {
     setProcesando(false);
   };
 
-  const handleDescargarPDF = () => {
+  const handleDescargarPDF = async () => {
     if (!certData || !txHash) return;
-    descargarCertificado({
+    await descargarCertificado({
       nombreEstudiante:     certData.nombreEstudiante,
       codigoCertificado:    certData.codigoCertificado,
       carrera:              "—",
